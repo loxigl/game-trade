@@ -1,0 +1,86 @@
+# Шаблон для микросервисов
+# Заменить SERVICE_NAME, SERVICE_PORT и дополнительные переменные среды для каждого сервиса
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: SERVICE_NAME
+  namespace: gametrade
+  labels:
+    app: SERVICE_NAME
+spec:
+  selector:
+    app: SERVICE_NAME
+  ports:
+    - port: SERVICE_PORT
+      targetPort: SERVICE_PORT
+      name: http
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: SERVICE_NAME-config
+  namespace: gametrade
+data:
+  .env: |
+    DATABASE_URL=postgresql://gametrade:gametrade@postgres:5432/gametrade
+    REDIS_URL=redis://redis:6379/1 # Использовать разные БД Redis для разных сервисов
+    RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
+    AUTH_SERVICE_URL=http://auth-svc:8000
+    ENVIRONMENT=production
+    LOG_LEVEL=INFO
+    API_PREFIX=/api
+    # SERVICE_SPECIFIC_ENV_VARS
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: SERVICE_NAME
+  namespace: gametrade
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: SERVICE_NAME
+  template:
+    metadata:
+      labels:
+        app: SERVICE_NAME
+    spec:
+      containers:
+        - name: SERVICE_NAME
+          image: gametrade/SERVICE_NAME:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: SERVICE_PORT
+              name: http
+          envFrom:
+            - configMapRef:
+                name: SERVICE_NAME-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: SERVICE_PORT
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: SERVICE_PORT
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          volumeMounts:
+            - name: SERVICE_NAME-config
+              mountPath: /app/.env
+              subPath: .env
+      volumes:
+        - name: SERVICE_NAME-config
+          configMap:
+            name: SERVICE_NAME-config 

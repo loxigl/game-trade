@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - redis.yaml
+  - rabbitmq.yaml
+  - nginx.yaml
+  - auth-svc.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: gametrade
+  app.kubernetes.io/managed-by: kustomize 

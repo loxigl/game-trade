@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: redis
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          readinessProbe:
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          livenessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 30 

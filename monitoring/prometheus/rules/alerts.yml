@@ -1,0 +1,56 @@
+groups:
+  - name: gametrade-alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: sum(rate(container_cpu_usage_seconds_total{namespace="gametrade"}[5m])) by (pod) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected in pod {{ $labels.pod }}"
+          description: "CPU usage is above 80% for more than 5 minutes in pod {{ $labels.pod }}"
+
+      - alert: HighMemoryUsage
+        expr: sum(container_memory_usage_bytes{namespace="gametrade"}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="gametrade"}) by (pod) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected in pod {{ $labels.pod }}"
+          description: "Memory usage is above 80% for more than 5 minutes in pod {{ $labels.pod }}"
+
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total{namespace="gametrade"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.pod }} has restarted more than 3 times in the last 15 minutes"
+
+      - alert: PodNotReady
+        expr: sum by (pod) (kube_pod_status_ready{condition="true", namespace="gametrade"}) < 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.pod }} not ready"
+          description: "Pod {{ $labels.pod }} has been in a non-ready state for more than 15 minutes"
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5..", namespace="gametrade"}[5m])) by (service) / sum(rate(http_requests_total{namespace="gametrade"}[5m])) by (service) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected for service {{ $labels.service }}"
+          description: "Error rate is above 5% for more than 5 minutes for service {{ $labels.service }}"
+
+      - alert: SlowResponses
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="gametrade"}[5m])) by (le, service)) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow responses detected for service {{ $labels.service }}"
+          description: "95th percentile of request latency is above 1 second for service {{ $labels.service }}" 

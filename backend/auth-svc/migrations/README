@@ -1,0 +1,29 @@
+# Инструкции по управлению миграциями
+
+## Запуск миграций в Docker
+Для корректного запуска миграций рекомендуется использовать Docker:
+
+```bash
+# Запустить контейнер PostgreSQL
+docker-compose up -d postgres
+
+# Запустить миграции в контейнере
+docker-compose run --rm auth-svc alembic upgrade head
+```
+
+## Создание новых миграций
+
+```bash
+# Создать пустую миграцию
+docker-compose run --rm auth-svc alembic revision -m "название миграции"
+
+# Создать автоматическую миграцию на основе моделей
+docker-compose run --rm auth-svc alembic revision --autogenerate -m "название миграции"
+```
+
+## Откат миграций
+
+```bash
+# Откатить на предыдущую миграцию
+docker-compose run --rm auth-svc alembic downgrade -1
+```
