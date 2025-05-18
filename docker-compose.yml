@@ -1,0 +1,296 @@
+version: '3.8'
+
+services:
+  # Базы данных PostgreSQL для каждого сервиса
+  postgres-auth:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gametrade
+      POSTGRES_PASSWORD: gametrade
+      POSTGRES_DB: auth_db
+    ports:
+      - "5430:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gametrade", "-d", "auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-marketplace:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gametrade
+      POSTGRES_PASSWORD: gametrade
+      POSTGRES_DB: marketplace_db
+    ports:
+      - "5431:5432"
+    volumes:
+      - postgres_marketplace_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gametrade", "-d", "marketplace_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-payment:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gametrade
+      POSTGRES_PASSWORD: gametrade
+      POSTGRES_DB: payment_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gametrade", "-d", "payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-chat:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: gametrade
+      POSTGRES_PASSWORD: gametrade
+      POSTGRES_DB: chat_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_chat_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gametrade", "-d", "chat_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis для кеширования
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # RabbitMQ для очередей сообщений
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: gametrade
+      RABBITMQ_DEFAULT_PASS: gametrade
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # NGINX API Gateway
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/static:/var/www/static
+      - ./nginx/html:/usr/share/nginx/html
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - auth-svc
+      - marketplace-svc
+      - payment-svc
+      - chat-svc
+      - frontend
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Prometheus NGINX Exporter для мониторинга
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    command:
+      - -nginx.scrape-uri=http://nginx:8080/nginx_status
+    ports:
+      - "9113:9113"
+    depends_on:
+      - nginx
+
+  # Сервис авторизации
+  auth-svc:
+    build:
+      context: ./backend/auth-svc
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/auth-svc:/app
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://gametrade:gametrade@postgres-auth:5432/auth_db
+      - REDIS_URL=redis://redis:6379/0
+       JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ENVIRONMENT=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Сервис маркетплейса
+  marketplace-svc:
+    build:
+      context: ./backend/marketplace-svc
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/marketplace-svc:/app
+    depends_on:
+      postgres-marketplace:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-svc:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://gametrade:gametrade@postgres-marketplace:5432/marketplace_db
+      - REDIS_URL=redis://redis:6379/1
+      - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
+      - AUTH_SERVICE_URL=http://auth-svc:8000
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
+      - ENVIRONMENT=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Сервис платежей
+  payment-svc:
+    build:
+      context: ./backend/payment-svc
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend/payment-svc:/app
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-svc:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://gametrade:gametrade@postgres-payment:5432/payment_db
+      - REDIS_URL=redis://redis:6379/2
+      - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
+      - AUTH_SERVICE_URL=http://auth-svc:8000
+      - ENVIRONMENT=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Сервис чата
+  chat-svc:
+    build:
+      context: ./backend/chat-svc
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./backend/chat-svc:/app
+    depends_on:
+      postgres-chat:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-svc:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://gametrade:gametrade@postgres-chat:5432/chat_db
+      - REDIS_URL=redis://redis:6379/3
+      - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
+      - AUTH_SERVICE_URL=http://auth-svc:8000
+      - ENVIRONMENT=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Фронтенд-сервис (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost/api
+        - NEXT_PUBLIC_AUTH_URL=http://localhost/api/auth
+        - NEXT_PUBLIC_MARKETPLACE_URL=http://localhost/api/marketplace
+        - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payment
+        - NEXT_PUBLIC_CHAT_URL=http://localhost/api/chat
+        - PORT=3000
+        - NEXT_PUBLIC_SHOW_DETAILED_ERRORS=true
+        - NEXT_PUBLIC_MAX_UPLOAD_SIZE=10485760
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost/api
+      - NEXT_PUBLIC_AUTH_URL=http://localhost/api/auth
+      - NEXT_PUBLIC_MARKETPLACE_URL=http://localhost/api/marketplace
+      - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payment
+      - NEXT_PUBLIC_CHAT_URL=http://localhost/api/chat
+    depends_on:
+      - auth-svc
+      - marketplace-svc
+      - payment-svc
+      - chat-svc
+
+volumes:
+  postgres_auth_data:
+  postgres_marketplace_data:
+  postgres_payment_data:
+  postgres_chat_data:
+
+    # Additional services and configurations can be added here
+    # For example, you can add more services or modify the existing ones

@@ -1,0 +1,165 @@
+name: GameTrade CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-push:
+    name: Build and push
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      environment: ${{ steps.set-environment.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Get version
+        id: get-version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            SHA=$(git rev-parse --short HEAD)
+            BRANCH=${GITHUB_REF#refs/heads/}
+            VERSION="${BRANCH}-${SHA}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Set deployment environment
+        id: set-environment
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            ENVIRONMENT="prod"
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            ENVIRONMENT="staging"
+          else
+            ENVIRONMENT="dev"
+          fi
+          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+
+      - name: Build and push auth-svc
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/auth-svc
+          push: true
+          tags: |
+            gametrade/auth-svc:latest
+            gametrade/auth-svc:${{ steps.get-version.outputs.version }}
+          cache-from: type=registry,ref=gametrade/auth-svc:buildcache
+          cache-to: type=registry,ref=gametrade/auth-svc:buildcache,mode=max
+
+      - name: Build and push marketplace-svc
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/marketplace-svc
+          push: true
+          tags: |
+            gametrade/marketplace-svc:latest
+            gametrade/marketplace-svc:${{ steps.get-version.outputs.version }}
+          cache-from: type=registry,ref=gametrade/marketplace-svc:buildcache
+          cache-to: type=registry,ref=gametrade/marketplace-svc:buildcache,mode=max
+
+      - name: Build and push payment-svc
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/payment-svc
+          push: true
+          tags: |
+            gametrade/payment-svc:latest
+            gametrade/payment-svc:${{ steps.get-version.outputs.version }}
+          cache-from: type=registry,ref=gametrade/payment-svc:buildcache
+          cache-to: type=registry,ref=gametrade/payment-svc:buildcache,mode=max
+
+      - name: Build and push chat-svc
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/chat-svc
+          push: true
+          tags: |
+            gametrade/chat-svc:latest
+            gametrade/chat-svc:${{ steps.get-version.outputs.version }}
+          cache-from: type=registry,ref=gametrade/chat-svc:buildcache
+          cache-to: type=registry,ref=gametrade/chat-svc:buildcache,mode=max
+
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ needs.build-and-push.outputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin
+
+      - name: Update image versions
+        run: |
+          VERSION=${{ needs.build-and-push.outputs.version }}
+          ENVDIR=dev
+          if [ "${{ needs.build-and-push.outputs.environment }}" == "prod" ]; then
+            ENVDIR=prod
+          fi
+          
+          cd kubernetes/overlays/$ENVDIR
+          
+          # Update images with kustomize
+          kustomize edit set image gametrade/auth-svc:latest=gametrade/auth-svc:$VERSION
+          kustomize edit set image gametrade/marketplace-svc:latest=gametrade/marketplace-svc:$VERSION
+          kustomize edit set image gametrade/payment-svc:latest=gametrade/payment-svc:$VERSION
+          kustomize edit set image gametrade/chat-svc:latest=gametrade/chat-svc:$VERSION
+
+      - name: Deploy to Kubernetes
+        run: |
+          ENVDIR=dev
+          if [ "${{ needs.build-and-push.outputs.environment }}" == "prod" ]; then
+            ENVDIR=prod
+          fi
+          
+          kubectl apply -k kubernetes/overlays/$ENVDIR
+          
+          # Verify deployment status
+          kubectl rollout status deployment/auth-svc -n gametrade
+          kubectl rollout status deployment/nginx -n gametrade
+
+      - name: Send deployment notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_ICON: https://github.com/rtCamp.png?size=48
+          SLACK_MESSAGE: 'GameTrade deployed to ${{ needs.build-and-push.outputs.environment }} :rocket:'
+          SLACK_TITLE: 'Deployment Notification'
+          SLACK_USERNAME: GitHub Actions 

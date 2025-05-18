@@ -1,0 +1,73 @@
+# Task ID: 8
+# Title: Create dispute resolution system
+# Status: pending
+# Dependencies: 5, 7
+# Priority: medium
+# Description: Implement the dispute system for handling conflicts between buyers and sellers with moderation tools.
+# Details:
+1. Create dispute database schema
+2. Implement dispute creation API
+3. Develop evidence upload functionality
+4. Create dispute resolution workflow for moderators
+5. Implement automatic dispute creation on transaction timeout
+6. Add notification system for dispute updates
+7. Create frontend UI for dispute creation and management
+8. Implement moderator dashboard for dispute handling
+9. Add dispute history for users
+10. Create dispute resolution outcomes (buyer, seller, split)
+
+# Test Strategy:
+1. Unit tests for dispute creation and resolution
+2. Integration tests for the complete dispute flow
+3. Test evidence upload functionality
+4. Verify moderator actions and permissions
+5. Test automatic dispute creation
+6. End-to-end testing of dispute resolution process
+
+# Subtasks:
+## 1. Create dispute data model and basic APIs [pending]
+### Dependencies: None
+### Description: Implement the database schema, models, and core APIs for the dispute resolution system
+### Details:
+1. Design and implement the dispute database schema with fields for dispute ID, related transaction, buyer/seller IDs, status, creation date, resolution date, and outcome
+2. Create the dispute model with appropriate relationships to users and transactions
+3. Implement the dispute creation API endpoint that allows users to open disputes for specific transactions
+4. Add API endpoints for fetching dispute details and updating dispute status
+5. Implement automatic dispute creation logic for transaction timeouts
+
+## 2. Develop evidence management and notification system [pending]
+### Dependencies: 8.1
+### Description: Create functionality for uploading and managing evidence in disputes, along with a notification system for updates
+### Details:
+1. Implement file upload functionality for evidence (images, documents, text)
+2. Create storage solution for evidence files with appropriate access controls
+3. Develop API endpoints for adding, viewing, and managing evidence
+4. Implement a notification system that alerts users about dispute updates
+5. Create notification templates for different dispute events (creation, evidence added, status changes, resolution)
+6. Add notification preferences for users to control how they receive dispute alerts
+
+## 3. Build user-facing dispute interface [pending]
+### Dependencies: 8.1, 8.2
+### Description: Create the frontend components for users to create, manage, and view disputes
+### Details:
+1. Design and implement dispute creation form with transaction selection and reason fields
+2. Create dispute detail view showing status, timeline, and evidence from both parties
+3. Implement evidence upload interface with drag-and-drop functionality
+4. Add dispute history section to user profiles showing past and current disputes
+5. Create notification center for dispute updates
+6. Implement responsive design for mobile and desktop views
+7. Add appropriate validation and error handling for all dispute-related actions
+
+## 4. Implement moderator tools and resolution workflow [pending]
+### Dependencies: 8.1, 8.2, 8.3
+### Description: Create the moderator dashboard and resolution workflow for handling disputes
+### Details:
+1. Design and implement moderator dashboard with dispute queue and filtering options
+2. Create detailed dispute view for moderators with all evidence and communication history
+3. Implement resolution workflow with options for different outcomes (buyer wins, seller wins, split decision)
+4. Add moderator tools for requesting additional information from either party
+5. Implement resolution confirmation process with appropriate fund distribution logic
+6. Create audit logs for moderator actions
+7. Add performance metrics for dispute resolution (time to resolve, outcome distribution)
+8. Implement access controls to ensure only authorized moderators can resolve disputes
+

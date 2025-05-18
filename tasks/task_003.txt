@@ -1,0 +1,161 @@
+# Task ID: 3
+# Title: Create database schema with dynamic categorization support
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Implement the database schema that supports dynamic categorization of items across different games with custom attributes.
+# Details:
+1. Create core tables (users, profiles, wallets, listings, transactions)
+2. Implement the dynamic categorization schema (games, item_categories, category_attributes, item_templates)
+3. Set up proper indexes for efficient querying
+4. Create database migrations using Alembic
+5. Implement SQLAlchemy models with relationships
+6. Add validation rules for dynamic attributes
+7. Create Pydantic schemas for API request/response validation
+8. Set up Elasticsearch indexing for efficient search
+9. Implement database seeding with initial game categories and attributes
+10. Create admin API endpoints for managing categories and attributes
+
+# Test Strategy:
+1. Unit tests for database models and relationships
+2. Test data validation for dynamic attributes
+3. Performance testing for complex queries
+4. Verify indexing strategy with large datasets
+5. Test Elasticsearch integration for search functionality
+6. Validate database migrations
+
+# Subtasks:
+## 1. Design and implement core database tables [done]
+### Dependencies: None
+### Description: Create the fundamental tables that form the backbone of the marketplace: users, profiles, wallets, listings, and transactions.
+### Details:
+Implement the following tables with appropriate columns and constraints:
+1. users: id (PK), email, password_hash, created_at, updated_at
+2. profiles: id (PK), user_id (FK), username, avatar_url, bio, created_at, updated_at
+3. wallets: id (PK), user_id (FK), balance, currency, created_at, updated_at
+4. listings: id (PK), seller_id (FK to users), item_id (FK), price, status, created_at, updated_at
+5. transactions: id (PK), buyer_id (FK to users), seller_id (FK to users), listing_id (FK), amount, status, created_at, updated_at
+
+Ensure proper foreign key constraints and indexes are set up for these core tables.
+
+## 2. Implement dynamic categorization schema [done]
+### Dependencies: 3.1
+### Description: Create the database schema that supports dynamic categorization of items across different games with custom attributes.
+### Details:
+Implement the following tables to support dynamic categorization:
+1. games: id (PK), name, description, logo_url, created_at, updated_at
+2. item_categories: id (PK), game_id (FK), name, description, created_at, updated_at
+3. category_attributes: id (PK), category_id (FK), name, attribute_type (enum: string, number, boolean, etc.), is_required, created_at, updated_at
+4. item_templates: id (PK), category_id (FK), name, description, created_at, updated_at
+5. items: id (PK), template_id (FK), owner_id (FK to users), created_at, updated_at
+6. item_attribute_values: id (PK), item_id (FK), attribute_id (FK to category_attributes), value_string, value_number, value_boolean (use appropriate column based on attribute_type), created_at, updated_at
+
+Ensure proper indexing for efficient querying, especially for the item_attribute_values table which will be heavily queried.
+
+## 3. Create SQLAlchemy models with relationships [done]
+### Dependencies: 3.2
+### Description: Implement SQLAlchemy ORM models for all database tables with proper relationships and validation rules.
+### Details:
+Create SQLAlchemy models for all tables implemented in subtasks 1 and 2. For each model:
+1. Define proper relationships (one-to-many, many-to-many) using relationship() function
+2. Implement __repr__ methods for debugging
+3. Add validation rules for dynamic attributes using SQLAlchemy validators
+4. Implement hybrid properties where needed
+5. Set up cascade delete rules appropriately
+6. Add type hints for all model attributes
+
+Example for the Item model:
+```python
+class Item(Base):
+    __tablename__ = 'items'
+    
+    id = Column(Integer, primary_key=True)
+    template_id = Column(Integer, ForeignKey('item_templates.id'))
+    owner_id = Column(Integer, ForeignKey('users.id'))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    template = relationship('ItemTemplate', back_populates='items')
+    owner = relationship('User', back_populates='items')
+    attribute_values = relationship('ItemAttributeValue', back_populates='item', cascade='all, delete-orphan')
+    listings = relationship('Listing', back_populates='item')
+    
+    def __repr__(self):
+        return f'<Item {self.id}>'    
+```
+
+## 4. Create database migrations using Alembic [done]
+### Dependencies: 3.3
+### Description: Set up Alembic for database migrations and create initial migration scripts for all tables.
+### Details:
+1. Initialize Alembic in the project:
+   ```bash
+   alembic init migrations
+   ```
+2. Configure Alembic to use the SQLAlchemy models
+3. Create the initial migration script:
+   ```bash
+   alembic revision --autogenerate -m "Initial database schema"
+   ```
+4. Review the generated migration script to ensure it correctly captures all tables, indexes, and constraints
+5. Test the migration by applying it to a test database:
+   ```bash
+   alembic upgrade head
+   ```
+6. Create a downgrade path to allow rollback if needed
+7. Document the migration process in the project README
+
+Ensure that the migration script handles the creation of all tables in the correct order to respect foreign key constraints.
+
+## 5. Implement Pydantic schemas and database seeding [done]
+### Dependencies: 3.3, 3.4
+### Description: Create Pydantic schemas for API validation and implement database seeding with initial game categories and attributes.
+### Details:
+1. Create Pydantic schemas for all models to validate API requests and responses:
+   - Base schemas for reading data
+   - Create schemas for creating new records
+   - Update schemas for updating existing records
+   - Include proper validation rules and example values
+
+2. Implement database seeding functionality:
+   - Create a seeding script that populates the database with initial data
+   - Add seed data for games (e.g., CS:GO, Dota 2, Fortnite)
+   - Add seed data for item categories for each game
+   - Add seed data for category attributes
+   - Add seed data for common item templates
+
+3. Example Pydantic schema:
+```python
+class ItemBase(BaseModel):
+    template_id: int
+
+class ItemCreate(ItemBase):
+    attribute_values: List[ItemAttributeValueCreate]
+
+class Item(ItemBase):
+    id: int
+    owner_id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+```
+
+4. Example seeding function:
+```python
+async def seed_games(db: Session):
+    games = [
+        {"name": "Counter-Strike: Global Offensive", "description": "FPS game with tradable skins"},
+        {"name": "Dota 2", "description": "MOBA game with tradable items"},
+        # Add more games
+    ]
+    
+    for game_data in games:
+        game = Game(**game_data)
+        db.add(game)
+    
+    db.commit()
+```
+

@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "generatedAt": "2025-05-12T17:04:34.524Z",
+    "tasksAnalyzed": 10,
+    "thresholdScore": 5,
+    "projectName": "Your Project Name",
+    "usedResearch": false
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Set up project infrastructure and base architecture",
+      "complexityScore": 9,
+      "recommendedSubtasks": 7,
+      "expansionPrompt": "Break down the project infrastructure setup into logical phases focusing on: 1) repository structure, 2) local development environment, 3) database setup, 4) messaging systems, 5) frontend initialization, 6) deployment configuration, and 7) monitoring setup. For each phase, identify specific technical tasks, potential challenges, and acceptance criteria.",
+      "reasoning": "This task involves setting up multiple complex infrastructure components (Docker, Kubernetes, PostgreSQL, Redis, RabbitMQ, Next.js, CI/CD) that span both frontend and backend. Each component requires specialized knowledge and has its own configuration challenges. The task also establishes the foundation for the entire project, making it critical to get right."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Implement authentication and user management",
+      "complexityScore": 8,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Divide the authentication system implementation into logical components: 1) core authentication mechanisms (JWT, password handling), 2) user registration flow, 3) login and session management, 4) OAuth integrations, 5) authorization system, and 6) frontend authentication components. For each component, specify the implementation details, security considerations, and testing requirements.",
+      "reasoning": "Authentication is security-critical and involves multiple complex components including JWT implementation, password security, OAuth integration with external providers, and role-based authorization. The system must handle sensitive user data securely while providing a smooth user experience across multiple authentication flows."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Create database schema with dynamic categorization support",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the database schema implementation into: 1) core entity design, 2) dynamic categorization system, 3) indexing and optimization strategy, 4) ORM implementation and migrations, and 5) search functionality. For each area, detail the specific tables/models needed, relationships between them, and how they support the dynamic nature of the marketplace.",
+      "reasoning": "This task requires designing a complex database schema that must support dynamic categorization across different games, each with custom attributes. The implementation includes not just database design but also ORM models, migrations, validation rules, and search indexing. The dynamic nature adds significant complexity as the schema must be flexible yet performant."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Develop marketplace core functionality",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the marketplace core functionality into: 1) listing management backend, 2) search and filtering system, 3) media handling for listings, 4) frontend listing creation and management, and 5) browsing and discovery features. For each component, specify the API endpoints needed, data validation requirements, and user interface considerations.",
+      "reasoning": "This task involves implementing the core marketplace functionality with complex search, filtering, and dynamic attribute validation. It requires both backend API development and frontend UI components. The search functionality with Elasticsearch adds complexity, as does handling dynamic attributes based on category rules."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement transaction and Escrow system",
+      "complexityScore": 9,
+      "recommendedSubtasks": 6,
+      "expansionPrompt": "Break down the transaction and escrow system into: 1) transaction model and state machine, 2) escrow mechanism, 3) transaction workflow API endpoints, 4) timeout and failure handling, 5) event system for state changes, and 6) frontend transaction flow. For each component, detail the security considerations, edge cases to handle, and testing scenarios.",
+      "reasoning": "The transaction system is highly complex and financially critical, requiring a secure escrow mechanism with multiple state transitions. It must handle edge cases like timeouts and disputes while maintaining data integrity. The event-driven nature adds complexity, as does the need for a seamless frontend experience for a critical user journey."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Build wallet and payment integration",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the wallet and payment system into: 1) wallet data model and operations, 2) deposit flow with Stripe, 3) withdrawal processing, 4) transaction history and reporting, and 5) security measures. For each component, specify the integration points with external services, error handling approaches, and compliance requirements.",
+      "reasoning": "This task involves handling real money transactions with third-party payment provider integration (Stripe). It requires implementing secure multi-currency wallets, payment processing, and withdrawal verification. Financial operations demand high security, proper error handling, and compliance with financial regulations."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Develop chat system between users",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the chat system implementation into: 1) data model and API endpoints, 2) real-time messaging with WebSockets, 3) media handling and message types, and 4) frontend chat interface. For each component, detail the performance considerations, scaling approach, and user experience requirements.",
+      "reasoning": "Implementing a real-time chat system requires WebSocket server setup, message persistence, and handling different message types. The system must track read/unread status and support image uploads. While complex, the scope is more contained than some other tasks, focusing specifically on communication functionality."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Create dispute resolution system",
+      "complexityScore": 6,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Divide the dispute resolution system into: 1) dispute data model and creation flow, 2) evidence management, 3) moderator tools and resolution workflow, and 4) user interfaces for dispute handling. For each component, specify the business rules, required permissions, and integration points with the transaction system.",
+      "reasoning": "The dispute system involves creating workflows for conflict resolution between users, with evidence upload and moderator tools. While it has multiple components, the scope is more defined than some other tasks, focusing on specific administrative and user flows for handling transaction disputes."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement notification system",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the notification system into: 1) notification data model and event handling, 2) delivery channels (WebSocket, email, push), 3) user preferences and management, and 4) frontend notification components. For each component, detail the technical implementation approach, performance considerations, and user experience requirements.",
+      "reasoning": "This task requires implementing multiple notification channels (WebSocket, email, push) with user preferences and real-time delivery. It involves creating templates, handling high-volume events, and developing a notification center UI. The integration with multiple system events adds complexity."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Build admin dashboard and analytics",
+      "complexityScore": 7,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Divide the admin dashboard implementation into: 1) core dashboard UI and metrics, 2) user and content moderation tools, 3) transaction and financial monitoring, 4) reporting and analytics features, and 5) system configuration and access control. For each component, specify the data requirements, visualization approaches, and administrative workflows.",
+      "reasoning": "The admin dashboard encompasses multiple administrative functions including user management, transaction monitoring, analytics, and system configuration. It requires implementing data visualization, report generation, and role-based access control. The breadth of functionality adds complexity, though each component builds on existing system features."
+    }
+  ]
+}

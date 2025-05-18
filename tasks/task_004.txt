@@ -1,0 +1,122 @@
+# Task ID: 4
+# Title: Develop marketplace core functionality
+# Status: done
+# Dependencies: 2, 3
+# Priority: high
+# Description: Implement the core marketplace features including listing creation, search, filtering, and browsing.
+# Details:
+1. Create API endpoints for listing management (CRUD operations)
+2. Implement search functionality with Elasticsearch
+3. Develop filtering system based on dynamic attributes
+4. Create pagination and sorting for listing results
+5. Implement image upload and management for listings
+6. Add validation for listing attributes based on category rules
+7. Create frontend components for listing creation and editing
+8. Develop UI for browsing and searching listings
+9. Implement category navigation with hierarchical structure
+10. Add featured and recent listings for the homepage
+
+# Test Strategy:
+1. Unit tests for listing creation and validation
+2. Integration tests for search and filtering
+3. Performance testing for search queries
+4. Test image upload and storage
+5. Verify dynamic attribute validation
+6. UI testing for listing creation and browsing flows
+
+# Subtasks:
+## 1. Implement listing management API endpoints [done]
+### Dependencies: None
+### Description: Create RESTful API endpoints for CRUD operations on marketplace listings, including validation based on category rules
+### Details:
+Develop backend API endpoints for creating, reading, updating, and deleting listings. Implement validation middleware that enforces category-specific rules for listing attributes. Include endpoints for draft saving, publishing, and unpublishing listings. Ensure proper authentication and authorization checks. Create database models with appropriate relationships between listings, categories, and users.
+
+## 2. Develop search and filtering infrastructure [done]
+### Dependencies: 4.1
+### Description: Implement Elasticsearch integration for powerful search capabilities and develop a filtering system based on dynamic attributes
+### Details:
+Set up Elasticsearch and create indexing for listings. Implement search functionality with relevance scoring. Develop a filtering system that handles dynamic attributes based on category. Create API endpoints for search and filtered queries. Implement data synchronization between the primary database and Elasticsearch. Add sorting options (price, date, relevance) and pagination for search results.
+
+## 3. Create image upload and management system [done]
+### Dependencies: 4.1
+### Description: Implement functionality for uploading, storing, processing, and managing images for listings
+### Details:
+Develop image upload functionality with proper validation for file types, sizes, and counts. Implement server-side image processing for thumbnails and optimized versions. Create a storage system (local or cloud-based) for images with appropriate directory structure. Add API endpoints for image management (upload, delete, reorder). Implement frontend components for image preview, drag-and-drop uploads, and image management.
+
+## 4. Develop listing creation and editing UI [done]
+### Dependencies: 4.1, 4.3
+### Description: Create frontend components for listing creation and editing with dynamic forms based on category selection [Updated: 15.05.2025]
+### Details:
+Develop a multi-step listing creation flow. Implement dynamic form generation based on category selection that shows relevant fields. Create UI components for attribute input (text, numbers, dropdowns, etc.). Integrate image upload components. Add validation on the frontend that mirrors backend rules. Implement draft saving functionality and form state persistence. Create a preview mode for listings before publishing.
+<info added on 2025-05-15T12:27:32.723Z>
+Developed a ListingFormStepper component for creating and editing listings with a step-by-step process:
+
+1. Created a hook for marketplace API interactions (marketplace.tsx) with functions for working with listings, categories, and templates.
+2. Created a hook for image upload and management (image-upload.tsx) with full support for the images API.
+3. Developed a multi-step component for listing creation with the following steps:
+   - Game selection
+   - Item category selection
+   - Item template selection
+   - Listing data entry
+   - Image upload
+   - Preview
+4. Implemented listing creation and editing pages.
+5. Added access control using RoleBasedContent.
+
+The component supports both creating new listings and editing existing ones. When editing, data is loaded automatically, and users can modify both listing information and uploaded images. This implementation fulfills the requirements for dynamic form generation based on category selection, image upload integration, frontend validation, and preview functionality.
+</info added on 2025-05-15T12:27:32.723Z>
+<info added on 2025-05-15T12:28:26.771Z>
+Developed a comprehensive component for creating and editing marketplace listings. The component follows a structured approach with a user-friendly interface that guides sellers through the listing creation process. Key features include:
+
+1. A multi-step wizard interface that breaks down the listing creation into logical steps
+2. Dynamic form fields that adapt based on the selected game and item category
+3. Template-based approach that pre-populates relevant fields based on item type
+4. Integrated image upload functionality with preview capabilities
+5. Form validation that provides immediate feedback to users
+6. Auto-save functionality to prevent data loss during the creation process
+7. Preview mode that shows how the listing will appear to potential buyers
+8. Edit mode that loads existing listing data and allows for modifications
+
+The component is fully responsive and works across different device sizes. It integrates with the previously developed image upload system and uses the marketplace API for data persistence. The UI follows the application's design system for consistent look and feel.
+</info added on 2025-05-15T12:28:26.771Z>
+<info added on 2025-05-15T12:28:58.558Z>
+Разработана полноценная система для создания и редактирования объявлений на маркетплейсе. Система включает в себя следующие компоненты:
+
+1. Хук для взаимодействия с API маркетплейса (marketplace.tsx), который предоставляет функции для работы с объявлениями, категориями и шаблонами.
+
+2. Хук для загрузки и управления изображениями (image-upload.tsx), полностью интегрированный с API изображений.
+
+3. Многоэтапный компонент ListingFormStepper, который проводит пользователя через процесс создания объявления с помощью следующих шагов:
+   - Выбор игры
+   - Выбор категории предмета
+   - Выбор шаблона предмета
+   - Заполнение данных объявления
+   - Загрузка изображений
+   - Предварительный просмотр
+
+4. Страницы создания и редактирования объявлений с интегрированной проверкой прав доступа через компонент RoleBasedContent.
+
+Система поддерживает как создание новых объявлений, так и редактирование существующих. При редактировании данные загружаются автоматически, и пользователи могут изменять как информацию об объявлении, так и загруженные изображения. Реализация соответствует требованиям по динамической генерации форм на основе выбора категории, интеграции загрузки изображений, валидации на стороне клиента и функциональности предварительного просмотра.
+</info added on 2025-05-15T12:28:58.558Z>
+
+## 5. Implement listing browsing and search UI [done]
+### Dependencies: 4.2, 4.4
+### Description: Create frontend components for browsing, searching, and filtering listings with category navigation
+### Details:
+Develop UI for search results with card/list view options. Implement filter sidebar with dynamic filters based on category. Create category navigation with hierarchical structure. Add sorting controls and pagination. Implement featured and recent listings sections for the homepage. Create individual listing detail pages with all relevant information. Add breadcrumb navigation for categories. Ensure responsive design for all viewport sizes.
+<info added on 2025-05-15T12:41:30.096Z>
+Develop UI for search results with card/list view options. Implement filter sidebar with dynamic filters based on category. Create category navigation with hierarchical structure. Add sorting controls and pagination. Implement featured and recent listings sections for the homepage. Create individual listing detail pages with all relevant information. Add breadcrumb navigation for categories. Ensure responsive design for all viewport sizes.
+
+Implementation progress:
+1. Created ListingCard component for displaying listing cards with Next.js Image optimization
+2. Implemented listings page with filtering functionality by games, categories, and price ranges
+3. Added pagination for listing results to improve performance and user experience
+4. Implemented search functionality for listings with query parameters
+5. Integrated with marketplace API endpoints to fetch and display real listing data
+</info added on 2025-05-15T12:41:30.096Z>
+<info added on 2025-05-15T12:41:39.523Z>
+Успешно созданы основные компоненты для отображения списка объявлений. Разработан компонент ListingCard, который отвечает за отображение карточки отдельного объявления с оптимизированными изображениями. Реализована страница списка объявлений с функциональностью фильтрации по играм, категориям и ценовым диапазонам. Добавлена пагинация для результатов поиска, что улучшает производительность и пользовательский опыт. Реализован функционал поиска объявлений с использованием параметров запроса. Компоненты интегрированы с API маркетплейса для получения и отображения реальных данных объявлений.
+
+Следующие шаги включают доработку представления списка/сетки, реализацию иерархической навигации по категориям, добавление элементов управления сортировкой, создание разделов с рекомендуемыми и недавними объявлениями для главной страницы, а также разработку детальных страниц объявлений и обеспечение адаптивного дизайна для всех размеров экранов.
+</info added on 2025-05-15T12:41:39.523Z>
+

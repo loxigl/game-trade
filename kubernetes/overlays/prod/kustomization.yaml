@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: gametrade
+
+commonLabels:
+  environment: production
+
+configMapGenerator:
+  - name: auth-svc-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+
+patchesStrategicMerge:
+  - postgres-prod.yaml
+  - redis-prod.yaml
+  - nginx-prod.yaml
+  - auth-svc-prod.yaml
+
+patchesJson6902:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: auth-svc
+    path: patches/auth-svc-hpa-patch.json 

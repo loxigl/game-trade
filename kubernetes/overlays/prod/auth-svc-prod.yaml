@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-svc
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: auth-svc
+          image: gametrade/auth-svc:stable
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "400m"
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            initialDelaySeconds: 40
+            periodSeconds: 30 

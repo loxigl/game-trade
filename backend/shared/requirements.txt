@@ -1,0 +1,8 @@
+# Основные зависимости для RabbitMQ
+aio-pika==9.3.1
+pika==1.3.2
+aiormq==6.7.7
+
+# Утилиты
+tenacity==8.4.2
+async-timeout==4.0.3 

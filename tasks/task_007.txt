@@ -1,0 +1,75 @@
+# Task ID: 7
+# Title: Develop chat system between users
+# Status: pending
+# Dependencies: 5
+# Priority: medium
+# Description: Implement the real-time chat system for communication between buyers and sellers during transactions.
+# Details:
+1. Create chat database schema (chats, chat_messages)
+2. Implement WebSocket server for real-time messaging
+3. Develop chat API endpoints for history and management
+4. Add message types support (text, image, system)
+5. Implement read/unread status tracking
+6. Create frontend chat UI components
+7. Add image upload in chat
+8. Implement chat notifications
+9. Add moderation access to chats for dispute resolution
+10. Create chat history retention policy
+
+# Test Strategy:
+1. Unit tests for chat message handling
+2. Integration tests for WebSocket connections
+3. Test image upload in chat
+4. Verify real-time message delivery
+5. Test chat history retrieval
+6. Performance testing with multiple concurrent chats
+
+# Subtasks:
+## 1. Create chat database schema and backend foundation [pending]
+### Dependencies: None
+### Description: Design and implement the database schema for the chat system and create the basic API endpoints for chat management
+### Details:
+1. Create database tables for chats (chat_id, participants, created_at, updated_at, status) and chat_messages (message_id, chat_id, sender_id, content, type, timestamp, read_status)
+2. Implement API endpoints for creating chats, retrieving chat history, and managing chats
+3. Set up basic chat service layer to handle business logic
+4. Implement chat history retention policy (e.g., messages older than X months are archived or deleted)
+5. Add unit tests for database models and API endpoints
+
+## 2. Implement WebSocket server for real-time messaging [pending]
+### Dependencies: 7.1
+### Description: Set up WebSocket infrastructure to enable real-time message delivery between users
+### Details:
+1. Set up WebSocket server using a library like Socket.IO or native WebSockets
+2. Implement connection management (authentication, connection pooling)
+3. Create message handling logic (receiving, validating, and broadcasting)
+4. Implement read/unread status tracking when messages are delivered and read
+5. Add support for different message types (text, image, system)
+6. Implement error handling and reconnection strategies
+7. Add logging for WebSocket events for debugging and monitoring
+
+## 3. Develop frontend chat UI components [pending]
+### Dependencies: 7.1, 7.2
+### Description: Create the user interface components for the chat system
+### Details:
+1. Design and implement chat list component showing all user conversations
+2. Create chat detail view with message history and input area
+3. Implement real-time message display with WebSocket integration
+4. Add support for displaying different message types (text, image, system)
+5. Implement read/unread indicators and timestamps
+6. Add loading states and pagination for message history
+7. Ensure responsive design works on mobile and desktop
+8. Implement basic input validation and message length limits
+
+## 4. Add advanced features and administrative capabilities [pending]
+### Dependencies: 7.2, 7.3
+### Description: Implement additional features including image uploads, notifications, and moderation tools
+### Details:
+1. Implement image upload functionality in chat (frontend and backend)
+2. Add file validation, size limits, and secure storage
+3. Create notification system for new messages (in-app and potentially push notifications)
+4. Implement moderation access for administrators to view chats for dispute resolution
+5. Add admin interface for viewing chat history between users
+6. Implement message filtering or flagging for inappropriate content
+7. Add performance monitoring for WebSocket connections and message delivery
+8. Create documentation for the chat system API and components
+
