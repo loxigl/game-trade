@@ -294,7 +294,7 @@
       "id": 5,
       "title": "Implement transaction and Escrow system",
       "description": "Develop the transaction processing system with Escrow functionality to ensure secure trading between users.",
-      "status": "pending",
+      "status": "done",
       "dependencies": [
         4
       ],
@@ -306,15 +306,15 @@
           "id": 1,
           "title": "Create transaction data model and database schema",
           "description": "Design and implement the core transaction data model with all necessary fields to support the Escrow flow and transaction states",
-          "status": "pending",
+          "status": "done",
           "dependencies": [],
-          "details": "Create a Transaction model with fields: id, buyer_id, seller_id, item_id, amount, fee, status (enum: PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED), created_at, updated_at, completion_deadline, notes, and metadata. Include foreign key relationships to users and items. Add database indexes for efficient querying by user, status, and date ranges. Implement validation rules to ensure data integrity. Create database migration scripts for the new schema."
+          "details": "Create a Transaction model with fields: id, buyer_id, seller_id, item_id, amount, fee, status (enum: PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED), created_at, updated_at, completion_deadline, notes, and metadata. Include foreign key relationships to users and items. Add database indexes for efficient querying by user, status, and date ranges. Implement validation rules to ensure data integrity. Create database migration scripts for the new schema.\n<info added on 2025-05-18T18:14:20.676Z>\nAfter analyzing the project structure and architecture, we will implement transactions in the payment-svc microservice. The marketplace-svc will interact with payment-svc through RabbitMQ to obtain information about transactions and wallets.\n\nIn payment-svc, we need to create the following directory structure:\n- models/ - for transaction and related data models\n- schemas/ - for validation schemas\n- services/ - for business logic implementation\n\nThe Transaction model should be implemented in payment-svc with the following fields:\n- id: unique identifier for the transaction\n- buyer_id: reference to the buyer user\n- seller_id: reference to the seller user\n- item_id: reference to the item being purchased\n- amount: transaction amount\n- fee: platform fee amount\n- status: enum (PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED)\n- created_at: timestamp of creation\n- updated_at: timestamp of last update\n- completion_deadline: deadline for transaction completion\n- notes: additional transaction notes\n- metadata: JSON field for extensibility\n\nDatabase indexes should be created for efficient querying by user, status, and date ranges. Implement validation rules to ensure data integrity. Create database migration scripts for the new schema.\n\nThe model should include all necessary fields to support the Escrow flow, with proper foreign key relationships to users and items tables.\n</info added on 2025-05-18T18:14:20.676Z>"
         },
         {
           "id": 2,
           "title": "Implement core transaction API endpoints and Escrow mechanism",
           "description": "Develop the essential API endpoints for transaction creation and the Escrow holding mechanism",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1
           ],
@@ -324,7 +324,7 @@
           "id": 3,
           "title": "Develop transaction state management and event system",
           "description": "Implement the state transition logic and event publishing system for transaction lifecycle events",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             2
           ],
@@ -334,7 +334,7 @@
           "id": 4,
           "title": "Implement transaction completion and dispute handling endpoints",
           "description": "Create API endpoints for finalizing transactions, handling disputes, and processing refunds",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             3
           ],
@@ -344,7 +344,7 @@
           "id": 5,
           "title": "Develop frontend transaction flow and user interfaces",
           "description": "Create the user interface components for the entire transaction lifecycle",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             4
           ],
@@ -354,11 +354,11 @@
           "id": 6,
           "title": "Implement transaction history and reporting system",
           "description": "Create comprehensive transaction history, details pages, and reporting functionality",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             5
           ],
-          "details": "Develop transaction history pages for both buyers and sellers with filtering options (date range, status, counterparty). Create detailed transaction view showing complete timeline of events, messages, and state changes. Implement CSV/PDF export functionality for transaction records. Add analytics dashboard for admins showing transaction volumes, success rates, dispute frequency, and other KPIs. Implement data retention policies and archiving for older transactions. Create automated reconciliation reports for accounting purposes."
+          "details": "Develop transaction history pages for both buyers and sellers with filtering options (date range, status, counterparty). Create detailed transaction view showing complete timeline of events, messages, and state changes. Implement CSV/PDF export functionality for transaction records. Add analytics dashboard for admins showing transaction volumes, success rates, dispute frequency, and other KPIs. Implement data retention policies and archiving for older transactions. Create automated reconciliation reports for accounting purposes.\n<info added on 2025-05-18T20:43:16.571Z>\nDevelop transaction history pages for both buyers and sellers with filtering options (date range, status, counterparty). Create detailed transaction view showing complete timeline of events, messages, and state changes. Implement CSV/PDF export functionality for transaction records. Add analytics dashboard for admins showing transaction volumes, success rates, dispute frequency, and other KPIs. Implement data retention policies and archiving for older transactions. Create automated reconciliation reports for accounting purposes.\n\nFixed an issue with the reserved name 'metadata' in the TransactionHistory model. The field name was changed to 'extra_data' to avoid conflicts with SQLAlchemy's internal attribute. Corresponding changes were made to the model, schemas, services, and routes. A database migration was added to update the database schema accordingly. This ensures proper storage and retrieval of additional transaction information without conflicts with the ORM system.\n</info added on 2025-05-18T20:43:16.571Z>"
         }
       ]
     },
@@ -366,7 +366,7 @@
       "id": 6,
       "title": "Build wallet and payment integration",
       "description": "Implement the wallet system with multi-currency support and integrate with Stripe for deposits and withdrawals.",
-      "status": "pending",
+      "status": "done",
       "dependencies": [
         5
       ],
@@ -378,15 +378,15 @@
           "id": 1,
           "title": "Create wallet data model with multi-currency support",
           "description": "Design and implement the core wallet data model that supports multiple currencies and basic transaction functionality",
-          "status": "pending",
+          "status": "done",
           "dependencies": [],
-          "details": "1. Create a Wallet model with fields for user_id, balance (as a map of currency:amount), and created_at/updated_at timestamps\n2. Create a Transaction model with fields for wallet_id, transaction_type (deposit, withdrawal, conversion), status, amount, currency, fee, external_reference_id, and timestamps\n3. Implement basic CRUD operations for both models\n4. Add database indexes for efficient queries\n5. Write unit tests for the models and their relationships\n6. Implement basic validation logic for transactions"
+          "details": "1. Create a Wallet model with fields for user_id, balance (as a map of currency:amount), and created_at/updated_at timestamps\n2. Create a Transaction model with fields for wallet_id, transaction_type (deposit, withdrawal, conversion), status, amount, currency, fee, external_reference_id, and timestamps\n3. Implement basic CRUD operations for both models\n4. Add database indexes for efficient queries\n5. Write unit tests for the models and their relationships\n6. Implement basic validation logic for transactions\n<info added on 2025-05-19T02:57:16.472Z>\nAfter examining the codebase, I discovered that wallet models already exist in the project but don't support multi-currency functionality within a single wallet. The current implementation creates separate wallets for each currency per user.\n\nKey existing files:\n1. `backend/payment-svc/src/models/wallet.py` - Contains Wallet and WalletTransaction models with Currency and WalletStatus enums. Currently has a UniqueConstraint('user_id', 'currency') enforcing single currency per wallet.\n2. `backend/payment-svc/src/schemas/wallet.py` - Contains Pydantic schemas for the API reflecting current model structure.\n3. `backend/payment-svc/src/models/transaction.py` and `backend/payment-svc/src/models/transaction_history.py` - Transaction models related to wallets.\n\nImplementation plan for multi-currency support:\n1. Modify the Wallet model:\n   - Replace single currency and balance fields with a JSON 'balances' field to store multiple currency:amount pairs\n   - Remove the UniqueConstraint('user_id', 'currency')\n   - Add appropriate validation for the balances field\n\n2. Update WalletTransaction model:\n   - Ensure it supports multi-currency operations\n   - Add or modify currency field to track which currency is involved in each transaction\n\n3. Update Pydantic schemas in wallet.py to reflect model changes\n\n4. Create database migration scripts to:\n   - Add the new balances JSON field\n   - Migrate existing wallet data to the new structure\n   - Remove old currency and balance fields\n\n5. Update related services that interact with wallets and transactions\n\n6. Implement and test validation logic for multi-currency transactions\n\n7. Update unit tests to cover the new multi-currency functionality\n</info added on 2025-05-19T02:57:16.472Z>"
         },
         {
           "id": 2,
           "title": "Implement Stripe integration for deposits",
           "description": "Connect the application with Stripe API to allow users to deposit funds into their wallet",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1
           ],
@@ -396,7 +396,7 @@
           "id": 3,
           "title": "Develop withdrawal functionality with verification",
           "description": "Implement secure withdrawal process with verification steps and Stripe payout integration",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2
@@ -407,7 +407,7 @@
           "id": 4,
           "title": "Add currency conversion and fee calculation",
           "description": "Implement currency conversion functionality and transaction fee calculation system",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1
           ],
@@ -417,7 +417,7 @@
           "id": 5,
           "title": "Build wallet UI and admin management tools",
           "description": "Create user interface components for wallet management and admin tools for oversight",
-          "status": "pending",
+          "status": "done",
           "dependencies": [
             1,
             2,

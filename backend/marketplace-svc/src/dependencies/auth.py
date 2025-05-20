@@ -78,13 +78,14 @@ async def get_current_user(
         
         # Ищем пользователя в локальной БД marketplace-svc
         db_user = db.query(User).filter(User.id == user_info.user_id).first()
-        
+        user_data = await AuthService.get_user_data(token)
         # Если пользователя нет в локальной БД, создаем его
         if not db_user:
             logger.info(f"Creating new user in marketplace-svc database: {user_info.user_id}")
             db_user = User(
                 id=user_info.user_id,
-                username=user_info.username
+                username=user_info.username,
+                email=user_data.email
             )
             db.add(db_user)
             db.commit()

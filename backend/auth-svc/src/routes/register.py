@@ -12,6 +12,7 @@ from ..models.user import User
 from ..schemas.user import UserCreate, UserResponse
 from ..services.password import hash_password, validate_password_strength
 from ..services.rate_limiter import rate_limit
+from ..services.user_event_service import UserEventService
 from ..config.settings import settings
 
 # Создаем роутер для регистрации
@@ -76,6 +77,9 @@ async def register_user(
         # Можно добавить отправку email с подтверждением в фоновую задачу
         # background_tasks.add_task(send_verification_email, new_user.email, verification_token)
         
+        # Публикуем событие о создании пользователя в RabbitMQ
+        background_tasks.add_task(UserEventService.publish_user_created, new_user)
+        
         return new_user
     except IntegrityError:
         db.rollback()
@@ -87,6 +91,7 @@ async def register_user(
 @router.get("/verify-email/{token}", status_code=status.HTTP_200_OK)
 async def verify_email(
     token: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ) -> Dict[str, str]:
     """
@@ -94,6 +99,7 @@ async def verify_email(
     
     Args:
         token: Токен подтверждения
+        background_tasks: Фоновые задачи FastAPI
         db: Сессия базы данных
         
     Returns:
@@ -124,6 +130,10 @@ async def verify_email(
     user.password_reset_expires = None
     
     db.commit()
+    db.refresh(user)
+    
+    # Публикуем событие об обновлении пользователя в RabbitMQ
+    background_tasks.add_task(UserEventService.publish_user_updated, user)
     
     return {"message": "Email успешно подтвержден"}
 

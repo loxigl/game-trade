@@ -113,7 +113,7 @@ class ListingDetailResponse(ListingResponse):
     item_template: Optional[ItemTemplateResponse] = None
     item_attributes: Optional[List[ItemAttributeValueResponse]] = []
     template_attributes: Optional[List[TemplateAttributeValueResponse]] = []
-    all_attributes: Optional[List[Dict[str, Any]]] = []
+    all_attributes: Optional[List[Union[ItemAttributeValueResponse, TemplateAttributeValueResponse]]] = []
     similar_listings: Optional[List[ListingResponse]] = []
     seller_rating: Optional[float] = None
 
@@ -124,16 +124,11 @@ class ListingDetailResponse(ListingResponse):
         
         # Добавляем атрибуты предмета
         if 'item_attributes' in values and values['item_attributes']:
-            for attr in values['item_attributes']:
-                item_attr = attr.dict()
-                combined_attrs.append(item_attr)
+            combined_attrs.extend(values['item_attributes'])
         
         # Добавляем атрибуты шаблона
         if 'template_attributes' in values and values['template_attributes']:
-            for attr in values['template_attributes']:
-                template_attr = attr.dict()
-                template_attr['is_template_attr'] = True
-                combined_attrs.append(template_attr)
+            combined_attrs.extend(values['template_attributes'])
         
         return combined_attrs
     

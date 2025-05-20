@@ -1,11 +1,11 @@
-import type { Config } from 'tailwindcss'
-
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+const config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class', // Активация переключения тем на основе класса .dark
   theme: {
     extend: {
       colors: {
@@ -58,9 +58,32 @@ const config: Config = {
           800: '#1f2937',
           900: '#111827',
         },
-        // Улучшенные цвета фона
-        background: '#ffffff',
-        foreground: '#000000',
+        // Переменные цветов темы
+        background: {
+          DEFAULT: 'var(--background)',
+        },
+        foreground: {
+          DEFAULT: 'var(--foreground)',
+        },
+        primary: {
+          DEFAULT: 'var(--primary)',
+          light: 'var(--primary-light)',
+          dark: 'var(--primary-dark)',
+        },
+        card: {
+          bg: 'var(--card-bg)',
+          border: 'var(--card-border)',
+        },
+        form: {
+          bg: 'var(--form-bg)',
+          input: 'var(--form-input-bg)',
+        },
+        text: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          inverted: 'var(--text-inverted)',
+        },
       },
       // Увеличиваем контрастность
       contrast: {
@@ -71,6 +94,8 @@ const config: Config = {
     },
   },
   plugins: [],
-}
+};
 
-export default config
+// Экспорт для поддержки как CommonJS, так и ES модулей
+module.exports = config;
+export default config;

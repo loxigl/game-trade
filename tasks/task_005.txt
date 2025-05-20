@@ -1,6 +1,6 @@
 # Task ID: 5
 # Title: Implement transaction and Escrow system
-# Status: pending
+# Status: done
 # Dependencies: 4
 # Priority: high
 # Description: Develop the transaction processing system with Escrow functionality to ensure secure trading between users.
@@ -25,39 +25,70 @@
 6. End-to-end testing of the purchase flow
 
 # Subtasks:
-## 1. Create transaction data model and database schema [pending]
+## 1. Create transaction data model and database schema [done]
 ### Dependencies: None
 ### Description: Design and implement the core transaction data model with all necessary fields to support the Escrow flow and transaction states
 ### Details:
 Create a Transaction model with fields: id, buyer_id, seller_id, item_id, amount, fee, status (enum: PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED), created_at, updated_at, completion_deadline, notes, and metadata. Include foreign key relationships to users and items. Add database indexes for efficient querying by user, status, and date ranges. Implement validation rules to ensure data integrity. Create database migration scripts for the new schema.
+<info added on 2025-05-18T18:14:20.676Z>
+After analyzing the project structure and architecture, we will implement transactions in the payment-svc microservice. The marketplace-svc will interact with payment-svc through RabbitMQ to obtain information about transactions and wallets.
 
-## 2. Implement core transaction API endpoints and Escrow mechanism [pending]
+In payment-svc, we need to create the following directory structure:
+- models/ - for transaction and related data models
+- schemas/ - for validation schemas
+- services/ - for business logic implementation
+
+The Transaction model should be implemented in payment-svc with the following fields:
+- id: unique identifier for the transaction
+- buyer_id: reference to the buyer user
+- seller_id: reference to the seller user
+- item_id: reference to the item being purchased
+- amount: transaction amount
+- fee: platform fee amount
+- status: enum (PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED)
+- created_at: timestamp of creation
+- updated_at: timestamp of last update
+- completion_deadline: deadline for transaction completion
+- notes: additional transaction notes
+- metadata: JSON field for extensibility
+
+Database indexes should be created for efficient querying by user, status, and date ranges. Implement validation rules to ensure data integrity. Create database migration scripts for the new schema.
+
+The model should include all necessary fields to support the Escrow flow, with proper foreign key relationships to users and items tables.
+</info added on 2025-05-18T18:14:20.676Z>
+
+## 2. Implement core transaction API endpoints and Escrow mechanism [done]
 ### Dependencies: 5.1
 ### Description: Develop the essential API endpoints for transaction creation and the Escrow holding mechanism
 ### Details:
 Create REST API endpoints for: 1) Transaction creation (POST /transactions) with payment processing integration, 2) Transaction status retrieval (GET /transactions/{id}), 3) Implement the Escrow holding mechanism that securely reserves funds when a transaction is created, moving from PENDING to ESCROW_HELD state. Include proper error handling for payment failures. Implement database transactions to ensure atomicity. Add authentication middleware to verify user permissions for each endpoint.
 
-## 3. Develop transaction state management and event system [pending]
+## 3. Develop transaction state management and event system [done]
 ### Dependencies: 5.2
 ### Description: Implement the state transition logic and event publishing system for transaction lifecycle events
 ### Details:
 Create a TransactionStateManager service that handles all state transitions with validation rules. Implement event publishing for state changes (transaction.created, transaction.escrow_held, transaction.completed, transaction.refunded, transaction.disputed). Add transaction timeout handling using a scheduled job that checks for expired transactions and automatically triggers appropriate state changes. Implement idempotency to prevent duplicate processing. Create comprehensive logging for all state changes for audit purposes.
 
-## 4. Implement transaction completion and dispute handling endpoints [pending]
+## 4. Implement transaction completion and dispute handling endpoints [done]
 ### Dependencies: 5.3
 ### Description: Create API endpoints for finalizing transactions, handling disputes, and processing refunds
 ### Details:
 Implement endpoints for: 1) Transaction completion (POST /transactions/{id}/complete) that releases funds from Escrow to seller, 2) Dispute creation (POST /transactions/{id}/dispute) with reason codes and evidence submission, 3) Refund processing (POST /transactions/{id}/refund) with full and partial refund support. Add admin endpoints for dispute resolution. Implement security measures to prevent unauthorized completion attempts. Create notification triggers for all major state changes to alert relevant users.
 
-## 5. Develop frontend transaction flow and user interfaces [pending]
+## 5. Develop frontend transaction flow and user interfaces [done]
 ### Dependencies: 5.4
 ### Description: Create the user interface components for the entire transaction lifecycle
 ### Details:
 Implement frontend components for: 1) Transaction initiation with payment method selection, 2) Transaction confirmation page with details and terms, 3) Transaction status tracking interface with real-time updates, 4) Completion confirmation flow, 5) Dispute submission form with evidence upload, 6) Transaction history list with filtering and sorting. Use optimistic UI updates combined with backend validation. Implement proper error handling and user feedback. Create responsive designs that work across device sizes.
 
-## 6. Implement transaction history and reporting system [pending]
+## 6. Implement transaction history and reporting system [done]
 ### Dependencies: 5.5
 ### Description: Create comprehensive transaction history, details pages, and reporting functionality
 ### Details:
 Develop transaction history pages for both buyers and sellers with filtering options (date range, status, counterparty). Create detailed transaction view showing complete timeline of events, messages, and state changes. Implement CSV/PDF export functionality for transaction records. Add analytics dashboard for admins showing transaction volumes, success rates, dispute frequency, and other KPIs. Implement data retention policies and archiving for older transactions. Create automated reconciliation reports for accounting purposes.
+<info added on 2025-05-18T20:43:16.571Z>
+Develop transaction history pages for both buyers and sellers with filtering options (date range, status, counterparty). Create detailed transaction view showing complete timeline of events, messages, and state changes. Implement CSV/PDF export functionality for transaction records. Add analytics dashboard for admins showing transaction volumes, success rates, dispute frequency, and other KPIs. Implement data retention policies and archiving for older transactions. Create automated reconciliation reports for accounting purposes.
+
+Fixed an issue with the reserved name 'metadata' in the TransactionHistory model. The field name was changed to 'extra_data' to avoid conflicts with SQLAlchemy's internal attribute. Corresponding changes were made to the model, schemas, services, and routes. A database migration was added to update the database schema accordingly. This ensures proper storage and retrieval of additional transaction information without conflicts with the ORM system.
+</info added on 2025-05-18T20:43:16.571Z>
 

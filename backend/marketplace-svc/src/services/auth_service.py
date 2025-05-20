@@ -1,11 +1,12 @@
 """Сервис для взаимодействия с auth-svc"""
 
+from dataclasses import Field
 import httpx
 import json
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 import logging
 from fastapi import HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from functools import lru_cache
 import os
 import time
@@ -27,6 +28,22 @@ class UserInfo(BaseModel):
     """Данные пользователя, полученные из токена"""
     user_id: int
     username: str
+class UserBase(BaseModel):
+    """Базовые поля пользователя"""
+    username: str
+    email: EmailStr
+class UserResponse(UserBase):
+    """Схема для ответа с данными пользователя"""
+    id: int
+    is_active: bool
+    is_verified: bool
+    is_admin: bool
+    roles: List[str]  # Добавляем поле ролей
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # Простой кэш для хранения результатов валидации токенов
@@ -108,3 +125,20 @@ class AuthService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Сервис аутентификации недоступен"
             )
+        
+    @staticmethod
+    async def get_user_data(token: str) -> Optional[UserResponse]:
+        """Получает данные пользователя из auth-svc"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{AUTH_SERVICE_URL}/account/me",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=5.0
+                )
+                if response.status_code != 200:
+                    logger.error(f"Ошибка получения данных пользователя: {response.status_code} - {response.text}")
+                    return None
+                return UserResponse(**response.json())
+        except (httpx.RequestError, json.JSONDecodeError) as e:
+            logger.error(f"Ошибка соединения с auth-svc: {str(e)}")

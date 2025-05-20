@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../hooks/auth';
 
-export default function LoginPage() {
+// Компонент с использованием useSearchParams
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -14,13 +15,48 @@ export default function LoginPage() {
   
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-
-  // Если пользователь авторизован, перенаправляем на главную страницу
+  const redirected = useRef(false);
+  const searchParams = useSearchParams();
+  
+  // Проверяем, был ли пользователь перенаправлен из-за ошибки аутентификации
+  const wasRedirected = searchParams?.get('redirected') === 'true';
+  const redirectFrom = searchParams?.get('from') || null;
+  
+  // Для отладки
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (typeof window !== 'undefined') {
+      console.log('Login page loaded. Auth state:', {
+        isAuthenticated,
+        isLoading,
+        wasRedirected,
+        redirectFrom,
+        accessToken: !!localStorage.getItem('accessToken'),
+        refreshToken: !!localStorage.getItem('refreshToken'),
+        token: !!localStorage.getItem('token')
+      });
+    }
+  }, [isAuthenticated, isLoading, wasRedirected, redirectFrom]);
+  
+  // Если redirected=true, показываем сообщение об ошибке
+  useEffect(() => {
+    if (wasRedirected && !error) {
+      const errorMessage = redirectFrom 
+        ? `Сессия истекла или вы не авторизованы при доступе к ${redirectFrom}. Пожалуйста, войдите снова.`
+        : 'Сессия истекла или вы не авторизованы. Пожалуйста, войдите снова.';
+      setError(errorMessage);
+    }
+  }, [wasRedirected, error, redirectFrom]);
+
+  // Проверяем, нужно ли сделать редирект, используя ref для отслеживания
+  useEffect(() => {
+    // Если пользователь был перенаправлен из-за ошибки аутентификации,
+    // не делаем автоматический редирект обратно, чтобы избежать цикла
+    if (!isLoading && isAuthenticated && !redirected.current && !wasRedirected) {
+      redirected.current = true; // Помечаем, что редирект уже выполнен
+      console.log('Redirecting to home after successful authentication');
       router.push('/');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, wasRedirected]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,27 +68,24 @@ export default function LoginPage() {
         throw new Error('Пожалуйста, заполните все поля');
       }
 
+      console.log('Attempting login with email:', email);
       await login({ email, password });
-      router.push('/');
+      console.log('Login successful, tokens set');
+      // Сбрасываем флаг redirected, чтобы useEffect мог выполнить редирект
+      redirected.current = false;
+      // Редирект выполнится через useEffect
     } catch (err) {
-      setError('Неверный email или пароль');
       console.error('Login error:', err);
+      setError('Неверный email или пароль');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <p>Загрузка...</p>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return null; // Редирект происходит в useEffect
-  }
+  // Убираем эту проверку, чтобы избежать преждевременного возврата null
+  // if (isAuthenticated) {
+  //   return null; // Редирект происходит в useEffect
+  // }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -149,5 +182,39 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// Фолбэк для Suspense
+function LoginFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-md">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            Загрузка...
+          </h2>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  const { isLoading } = useAuth();
+
+  // Показываем индикатор загрузки
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p>Загрузка...</p>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginForm />
+    </Suspense>
   );
 } 

@@ -56,6 +56,34 @@ async def get_listings(
         meta=result["meta"]
     )
 
+@router.get("/my-listings", response_model=SuccessResponse[List[ListingResponse]])
+async def get_my_listings(
+    pagination: PaginationParams = Depends(),
+    status: Optional[str] = Query(None, description="Фильтр по статусу объявления"),
+    sort_by: str = Query("created_at", description="Поле для сортировки"),
+    sort_order: str = Query("desc", description="Порядок сортировки (asc или desc)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получение списка объявлений текущего пользователя
+    """
+    listing_service = ListingService(db)
+    result = listing_service.get_listings(
+        pagination=pagination,
+        status=status,
+        seller_id=current_user.id,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+    
+    return SuccessResponse(
+        data=result["items"],
+        meta=result["meta"]
+    )
+
+
+
 
 @router.get("/{listing_id}", response_model=SuccessResponse[ListingDetailResponse])
 async def get_listing(
@@ -162,32 +190,6 @@ async def delete_listing(
         meta={"message": "Объявление успешно удалено"}
     )
 
-
-@router.get("/my-listings", response_model=SuccessResponse[List[ListingResponse]])
-async def get_my_listings(
-    pagination: PaginationParams = Depends(),
-    status: Optional[str] = Query(None, description="Фильтр по статусу объявления"),
-    sort_by: str = Query("created_at", description="Поле для сортировки"),
-    sort_order: str = Query("desc", description="Порядок сортировки (asc или desc)"),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Получение списка объявлений текущего пользователя
-    """
-    listing_service = ListingService(db)
-    result = listing_service.get_listings(
-        pagination=pagination,
-        status=status,
-        seller_id=current_user.id,
-        sort_by=sort_by,
-        sort_order=sort_order
-    )
-    
-    return SuccessResponse(
-        data=result["items"],
-        meta=result["meta"]
-    )
 
 
 @router.get("/{listing_id}/detail", response_model=SuccessResponse[ListingDetailResponse])

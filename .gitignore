@@ -77,4 +77,16 @@ Desktop.ini
 *.ntvs*
 *.njsproj
 *.sln
-*.sw? 
+*.sw?
+
+# Added by Claude Task Master
+logs
+dev-debug.log
+# Dependency directories
+# Environment variables
+.idea
+.vscode
+# OS specific
+# Task files
+tasks.json
+tasks/ 

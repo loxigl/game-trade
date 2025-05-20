@@ -195,6 +195,7 @@ async def logout(
 @router.post("/validate", response_model=TokenValidateResponse)
 async def validate_token(
     token_data: TokenValidateRequest,
+    db: Session = Depends(get_db)
 ) -> TokenValidateResponse:
     """
     Валидация JWT токена
@@ -210,6 +211,8 @@ async def validate_token(
     try:
         # Декодируем токен
         payload = decode_token(token_data.token)
+
+        user = db.query(User).filter(User.id == payload.get("sub", 0)).first()
         
         # Возвращаем информацию о валидности токена и пользователя
         return TokenValidateResponse(

@@ -15,6 +15,9 @@
     icon_url: string;
     game_id: number;
     game_name: string;
+    parent_id?: number | null;
+    subcategories?: Category[];
+    description?: string;
   }
 
   interface Attribute {
@@ -115,40 +118,26 @@
 
   // Хук для работы с API маркетплейса
   export const useMarketplace = () => {
-    const { isAuthenticated } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, getAuthHeader } = useAuth();
+  const cacheRef = useRef<Map<string, { data: any; timestamp: number }>>(new Map());
+  const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
+  const CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
-    // API URL для маркетплейса
-    const API_URL = process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8001/api/marketplace';
-
-    // Кэш для хранения результатов запросов
-    const cacheRef = useRef<Map<string, { data: any, timestamp: number }>>(new Map());
-    // Время жизни кэша (5 минут)
-    const CACHE_TTL = 5 * 60 * 1000;
-    // Отслеживание текущих запросов
-    const pendingRequestsRef = useRef<Map<string, AbortController>>(new Map());
-
-    // Функция для создания ключа кэша
     const createCacheKey = (endpoint: string, params?: any) => {
-      return `${endpoint}:${params ? JSON.stringify(params) : ''}`;
+    return params ? `${endpoint}:${JSON.stringify(params)}` : endpoint;
     };
 
-    // Функция для проверки и получения данных из кэша
     const getFromCache = (cacheKey: string) => {
-      if (cacheRef.current.has(cacheKey)) {
-        const cachedData = cacheRef.current.get(cacheKey);
-        if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
-          return cachedData.data;
-        } else {
-          // Удаляем устаревший кэш
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
           cacheRef.current.delete(cacheKey);
-        }
-      }
       return null;
     };
 
-    // Функция для сохранения данных в кэш
     const saveToCache = (cacheKey: string, data: any) => {
       cacheRef.current.set(cacheKey, {
         data,
@@ -156,93 +145,57 @@
       });
     };
 
-    // Функция для выполнения запроса с кэшированием
-    const fetchWithCache = async (endpoint: string, options: RequestInit = {}, params?: any, useCache = true) => {
+  const fetchWithCache = useCallback(async (
+    endpoint: string,
+    options: RequestInit = {},
+    params?: any,
+    useCache = true
+  ) => {
       const cacheKey = createCacheKey(endpoint, params);
 
-      // Проверяем, есть ли данные в кэше
       if (useCache) {
         const cachedData = getFromCache(cacheKey);
-        if (cachedData) {
-          return cachedData;
-        }
+      if (cachedData) return cachedData;
       }
 
-      // Отменяем предыдущий запрос с такими же параметрами, если он еще выполняется
-      if (pendingRequestsRef.current.has(cacheKey)) {
-        pendingRequestsRef.current.get(cacheKey)?.abort();
-        pendingRequestsRef.current.delete(cacheKey);
+    // Проверяем, есть ли уже запрос с таким ключом
+    const existingRequest = pendingRequestsRef.current.get(cacheKey);
+    if (existingRequest) {
+      return existingRequest;
       }
 
-      // Создаем новый AbortController для текущего запроса
-      const abortController = new AbortController();
-      pendingRequestsRef.current.set(cacheKey, abortController);
-
-      try {
-        const response = await fetch(endpoint, {
-          ...options,
-          signal: abortController.signal
-        });
-
+    // Создаем новый запрос
+    const request = fetch(endpoint, options)
+      .then(async (response) => {
         if (!response.ok) {
-          // Получаем подробную информацию об ошибке
-          let errorMessage = `API error: ${response.status}`;
-          let errorDetails: any = null;
-          
-          try {
-            // Пытаемся прочитать JSON с деталями ошибки
-            const errorData = await response.clone().json();
-            errorDetails = errorData;
-            
-            if (errorData.detail) {
-              if (typeof errorData.detail === 'string') {
-                errorMessage = errorData.detail;
-              } else if (Array.isArray(errorData.detail)) {
-                errorMessage = errorData.detail.map((e: any) => 
-                  e.loc && e.msg ? `${e.loc.join('.')}: ${e.msg}` : JSON.stringify(e)
-                ).join('; ');
-              } else {
-                errorMessage = JSON.stringify(errorData.detail);
-              }
-            }
-          } catch (jsonErr) {
-            // Если не удалось прочитать JSON, пробуем прочитать текст
-            try {
-              errorMessage = await response.clone().text();
-            } catch (textErr) {
-              console.error('Не удалось прочитать ответ ошибки:', textErr);
-            }
-          }
-          
-          // Создаем расширенный объект ошибки с дополнительными данными
-          const error = new Error(errorMessage);
-          (error as any).status = response.status;
-          (error as any).details = errorDetails;
-          (error as any).response = response;
-          
-          // Бросаем расширенную ошибку
-          throw error;
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
         }
-
         const data = await response.json();
-
-        // Сохраняем результаты в кэш
         if (useCache) {
           saveToCache(cacheKey, data);
         }
-
         return data;
-      } finally {
-        // Удаляем запрос из списка выполняемых
+      })
+      .finally(() => {
         pendingRequestsRef.current.delete(cacheKey);
-      }
-    };
+      });
 
-    // Получение токена авторизации
-    const getAuthHeader = useCallback(() => {
-      const token = localStorage.getItem('accessToken');
-      return token ? { Authorization: `Bearer ${token}` } : undefined;
+    // Сохраняем запрос в Map
+    pendingRequestsRef.current.set(cacheKey, request);
+    return request;
+  }, []);
+
+  // Очистка кэша при размонтировании
+  useEffect(() => {
+    return () => {
+      cacheRef.current.clear();
+      pendingRequestsRef.current.clear();
+    };
     }, []);
+
+  // API URL для маркетплейса
+  const API_URL = process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8001/api/marketplace';
 
     // Получение списка игр
     const getGames = useCallback(async (): Promise<Game[]> => {
@@ -260,7 +213,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Получение категорий для выбранной игры
     const getCategoriesByGame = useCallback(async (gameId: number): Promise<Category[]> => {
@@ -268,8 +221,49 @@
       setError(null);
 
       try {
-        const data = await fetchWithCache(`${API_URL}/categories?game_id=${gameId}`);
-        return data.data || [];
+        // Добавляем параметр includeSubcategories=true, чтобы получить иерархическую структуру категорий
+        const data = await fetchWithCache(`${API_URL}/categories?game_id=${gameId}&includeSubcategories=true`);
+        
+        let categories = data.data || [];
+        
+        // Проверяем, есть ли в категориях поле subcategories. Если нет, то преобразуем плоский список в иерархию
+        if (categories.length > 0 && categories.every(cat => !cat.subcategories)) {
+          console.log('Сервер вернул плоский список категорий, преобразуем в иерархию...');
+          
+          // Создаем словарь всех категорий по ID для быстрого доступа
+          const categoriesMap = categories.reduce((map, cat) => {
+            map[cat.id] = { ...cat, subcategories: [] };
+            return map;
+          }, {});
+          
+          // Создаем иерархическую структуру
+          const rootCategories = [];
+          
+          for (const id in categoriesMap) {
+            const category = categoriesMap[id];
+            
+            if (category.parent_id) {
+              // Это подкатегория - добавляем ее к родительской категории
+              if (categoriesMap[category.parent_id]) {
+                if (!categoriesMap[category.parent_id].subcategories) {
+                  categoriesMap[category.parent_id].subcategories = [];
+                }
+                categoriesMap[category.parent_id].subcategories.push(category);
+              } else {
+                console.warn(`Родительская категория с ID ${category.parent_id} не найдена для категории ${category.name}`);
+                rootCategories.push(category);
+              }
+            } else {
+              // Это корневая категория
+              rootCategories.push(category);
+            }
+          }
+          
+          console.log(`Построена иерархия: ${rootCategories.length} корневых категорий`);
+          categories = rootCategories;
+        }
+        
+        return categories;
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
           setError(err.message || 'Произошла ошибка при загрузке категорий');
@@ -278,7 +272,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+    }, [fetchWithCache]);
 
     // Получение атрибутов для выбранной категории
     const getAttributesByCategory = useCallback(async (categoryId: number): Promise<Attribute[]> => {
@@ -296,7 +290,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Получение атрибутов для выбранного шаблона
     const getTemplateAttributes = useCallback(async (templateId: number): Promise<any[]> => {
@@ -314,7 +308,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Получение шаблонов предметов по категории
     const getTemplatesByCategory = useCallback(async (categoryId: number): Promise<ItemTemplate[]> => {
@@ -332,7 +326,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Поиск объявлений с фильтрацией
     const searchListings = useCallback(async (
@@ -397,7 +391,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Получение объявления по ID
     const getListingById = useCallback(async (listingId: number): Promise<Listing | null> => {
@@ -416,10 +410,10 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL]);
+  }, [fetchWithCache]);
 
     // Создание нового объявления
-    const createListing = useCallback(async (formData: ListingFormData): Promise<Listing | null> => {
+    const createListing = useCallback(async (data: ListingFormData | FormData): Promise<Listing | null> => {
       if (!isAuthenticated) {
         setError('Необходимо авторизоваться для создания объявления');
         return null;
@@ -429,29 +423,53 @@
       setError(null);
 
       try {
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json'
-        };
-
+        const headers: Record<string, string> = {};
         const authHeader = getAuthHeader();
         if (authHeader) {
-          Object.assign(headers, authHeader);
+          headers['Authorization'] = authHeader;
         }
 
-        const data = await fetchWithCache(
-          `${API_URL}/listings`,
-          {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(formData)
-          },
-          formData,
-          false // Не используем кэш для создания
-        );
+        // Проверяем тип данных и при необходимости конвертируем
+        let requestBody: any;
 
-        return data.data;
+        if (data instanceof FormData) {
+          requestBody = data;
+          // НЕ устанавливаем Content-Type для FormData - браузер сам добавит с правильным boundary
+          console.log('Отправка FormData с автоматически добавляемым браузером Content-Type');
+          
+          // Удаляем Content-Type из заголовков, если он там есть
+          delete headers['Content-Type'];
+        } else {
+          requestBody = JSON.stringify(data);
+          headers['Content-Type'] = 'application/json';
+          console.log('Отправка JSON с Content-Type: application/json');
+        }
+
+        console.log('Заголовки запроса:', headers);
+        console.log('Тип тела запроса:', data instanceof FormData ? 'FormData' : 'JSON');
+
+        // Используем fetch напрямую для всех типов данных
+        const response = await fetch(`${API_URL}/listings`, {
+          method: 'POST',
+          headers: headers,
+          body: requestBody,
+          credentials: 'include' // Добавляем куки (на случай, если авторизация идет через них)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Ошибка создания объявления:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        const responseData = await response.json();
+        return responseData;
       } catch (err) {
-        // Просто пробрасываем ошибку дальше для обработки в компоненте
+        // Подробный лог ошибки
         console.error('Ошибка при создании объявления:', err);
         
         // Сохраняем сообщение в состоянии ошибки
@@ -466,10 +484,10 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL, isAuthenticated, getAuthHeader]);
+    }, [isAuthenticated, getAuthHeader, API_URL]);
 
     // Обновление объявления
-    const updateListing = useCallback(async (listingId: number, formData: Partial<ListingFormData>): Promise<Listing | null> => {
+    const updateListing = useCallback(async (listingId: number, formData: Partial<ListingFormData> | FormData): Promise<Listing | null> => {
       if (!isAuthenticated) {
         setError('Необходимо авторизоваться для обновления объявления');
         return null;
@@ -479,28 +497,49 @@
       setError(null);
 
       try {
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json'
-        };
-
+        const headers: Record<string, string> = {};
+        
         const authHeader = getAuthHeader();
         if (authHeader) {
-          Object.assign(headers, authHeader);
+          headers['Authorization'] = authHeader;
         }
 
-        // Используем fetchWithCache для унификации обработки ошибок
-        const data = await fetchWithCache(
-          `${API_URL}/listings/${listingId}`,
-          {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(formData)
-          },
-          formData,
-          false // Не используем кэш для обновления
-        );
+        let requestBody: any;
+        
+        // Проверяем, является ли formData экземпляром FormData
+        if (formData instanceof FormData) {
+          requestBody = formData;
+          // НЕ устанавливаем Content-Type для FormData, браузер сам добавит с правильным boundary
+          console.log('Отправка FormData с автоматически добавляемым браузером Content-Type');
+          
+          // Удаляем Content-Type из заголовков, если он там есть
+          delete headers['Content-Type'];
+        } else {
+          headers['Content-Type'] = 'application/json';
+          requestBody = JSON.stringify(formData);
+          console.log('Отправка JSON с Content-Type: application/json');
+        }
 
-        return data.data;
+        // Используем fetch напрямую для всех типов данных
+        const response = await fetch(`${API_URL}/listings/${listingId}`, {
+          method: 'PUT',
+          headers: headers,
+          body: requestBody,
+          credentials: 'include' // Добавляем куки (если авторизация идет через них)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Ошибка обновления объявления:', {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          throw new Error(errorText || `HTTP error! status: ${response.status}`);
+        }
+
+        const responseData = await response.json();
+        return responseData;
       } catch (err) {
         // Просто пробрасываем ошибку дальше для обработки в компоненте
         console.error('Ошибка при обновлении объявления:', err);
@@ -517,7 +556,7 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL, isAuthenticated, getAuthHeader]);
+    }, [fetchWithCache, isAuthenticated, getAuthHeader, API_URL]);
 
     // Удаление объявления
     const deleteListing = useCallback(async (listingId: number): Promise<boolean> => {
@@ -530,20 +569,25 @@
       setError(null);
 
       try {
-        const headers: HeadersInit = {};
+        const headers: Record<string, string> = {};
 
         const authHeader = getAuthHeader();
         if (authHeader) {
-          Object.assign(headers, authHeader);
+          headers['Authorization'] = authHeader;
         }
 
         const response = await fetch(`${API_URL}/listings/${listingId}`, {
           method: 'DELETE',
-          headers
+          headers,
+          credentials: 'include' // Добавляем куки (если авторизация идет через них)
         });
 
         if (!response.ok) {
-          throw new Error('Failed to delete listing');
+          console.error('Ошибка удаления объявления:', {
+            status: response.status,
+            statusText: response.statusText
+          });
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         return true;
@@ -553,22 +597,82 @@
       } finally {
         setIsLoading(false);
       }
-    }, [API_URL, isAuthenticated, getAuthHeader]);
+    }, [isAuthenticated, getAuthHeader, API_URL]);
 
-    // Очистка кэша
-    const clearCache = useCallback(() => {
-      cacheRef.current.clear();
-    }, []);
+    // Получение объявлений текущего пользователя
+    const getUserListings = useCallback(async (
+      status?: string,
+      page: number = 1,
+      pageSize: number = 10,
+      sortBy: string = 'created_at',
+      sortOrder: string = 'desc'
+    ): Promise<{ items: Listing[], meta: PaginationMeta }> => {
+      setIsLoading(true);
+      setError(null);
 
-    // Отмена всех текущих запросов
-    useEffect(() => {
-      return () => {
-        pendingRequestsRef.current.forEach(controller => {
-          controller.abort();
+      try {
+        const url = new URL(`${API_URL}/listings/my-listings`);
+        if (status) url.searchParams.append('status', status);
+        url.searchParams.append('page', page.toString());
+        url.searchParams.append('limit', pageSize.toString());
+        url.searchParams.append('sort_by', sortBy);
+        url.searchParams.append('sort_order', sortOrder);
+
+        const headers: Record<string, string> = {};
+        
+        const authHeader = getAuthHeader();
+        if (authHeader) {
+          headers['Authorization'] = authHeader;
+        }
+
+        console.log('Запрос на получение объявлений пользователя:', {
+          url: url.toString(),
+          headers
         });
-        pendingRequestsRef.current.clear();
-      };
-    }, []);
+
+        const response = await fetch(url.toString(), {
+          headers,
+          credentials: 'include' // Добавляем куки (если авторизация идет через них)
+        });
+
+        if (!response.ok) {
+          console.error('Ошибка получения объявлений пользователя:', {
+            status: response.status,
+            statusText: response.statusText
+          });
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Получены объявления пользователя:', data);
+        
+        return {
+          items: data.data || [],
+          meta: {
+            current_page: data.meta?.page || 1,
+            total_pages: data.meta?.pages || 1,
+            total_items: data.meta?.total || 0,
+            items_per_page: data.meta?.limit || pageSize
+          }
+        };
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Ошибка при получении объявлений пользователя:', err);
+          setError(err.message || 'Произошла ошибка при получении объявлений пользователя');
+        }
+        return {
+          items: [],
+          meta: {
+            current_page: 1,
+            total_pages: 1,
+            total_items: 0,
+            items_per_page: pageSize
+          }
+        };
+      } finally {
+        setIsLoading(false);
+      }
+    }, [API_URL, getAuthHeader]);
 
     // Возвращаем методы и состояние
     return {
@@ -584,6 +688,6 @@
       createListing,
       updateListing,
       deleteListing,
-      clearCache
+      getUserListings,
     };
   };

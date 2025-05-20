@@ -1,8 +1,22 @@
-from sqlalchemy import Column, Integer, String, Float, Enum, DateTime, ForeignKey, Table, Text, Boolean, UniqueConstraint, Index, ForeignKeyConstraint
+from sqlalchemy import Column, Integer, String, Float, Enum, DateTime, ForeignKey, Table, Text, Boolean, UniqueConstraint, Index, ForeignKeyConstraint, ARRAY
 from sqlalchemy.sql import func, expression
 from sqlalchemy.orm import relationship
 from ..database.connection import Base
 import enum
+from sqlalchemy import JSON, Enum as SQLAlchemyEnum
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+from datetime import datetime
+
+class SaleStatus(str, enum.Enum):
+    """Статусы продажи"""
+    PENDING = "pending"           # Ожидает оплаты
+    PAYMENT_PROCESSING = "payment_processing"  # Обработка оплаты
+    DELIVERY_PENDING = "delivery_pending"  # Ожидает передачи товара
+    COMPLETED = "completed"       # Завершена успешно
+    CANCELED = "canceled"       # Отменена
+    REFUNDED = "refunded"        # Возвращены средства
+    DISPUTED = "disputed"   
 
 class ListingStatus(str, enum.Enum):
     """Статусы объявлений"""
@@ -19,7 +33,7 @@ class TransactionStatus(str, enum.Enum):
     PENDING = "pending"         # Ожидает оплаты
     PAID = "paid"               # Оплачено, ожидает передачи товара
     COMPLETED = "completed"     # Завершена успешно
-    CANCELLED = "cancelled"     # Отменена
+    CANCELED = "canceled"     # Отменена
     REFUNDED = "refunded"       # Возвращены средства
     DISPUTED = "disputed"       # В споре
 
@@ -52,6 +66,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
+    is_active = Column(Boolean, server_default=expression.true(), nullable=False)
+    is_verified = Column(Boolean, server_default=expression.false(), nullable=False)
+    is_admin = Column(Boolean, server_default=expression.false(), nullable=False)
+    roles = Column(ARRAY(String), server_default="{'user'}", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     
@@ -110,11 +128,11 @@ class Listing(Base):
     # Новое поле - внешний ключ на шаблон предмета
     item_template_id = Column(Integer, ForeignKey("item_templates.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False, index=True)
-    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
     currency = Column(String, default="USD", nullable=False)
-    status = Column(Enum(ListingStatus), default=ListingStatus.PENDING, nullable=False)
+    status = Column(SQLAlchemyEnum(ListingStatus, name='listingstatus', create_type=True, values_callable=lambda enum: [e.value for e in enum]), server_default=ListingStatus.PENDING.value, nullable=False)
     views_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
@@ -144,7 +162,7 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     currency = Column(String, default="USD", nullable=False)
     fee_amount = Column(Float, default=0.0, nullable=False)
-    status = Column(Enum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False)
+    status = Column(SQLAlchemyEnum(TransactionStatus, name='transactionstatus', create_type=True, values_callable=lambda enum: [e.value for e in enum]), server_default=TransactionStatus.PENDING.value, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -161,14 +179,14 @@ class Image(Base):
     id = Column(Integer, primary_key=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     entity_id = Column(Integer, nullable=True)  # ID связанной сущности
-    type = Column(Enum(ImageType), nullable=False, default=ImageType.OTHER)
+    type = Column(SQLAlchemyEnum(ImageType, name="imagetype", create_type=True, values_callable=lambda enum: [e.value for e in enum]), nullable=False, server_default=ImageType.OTHER.value)
     filename = Column(String(255), nullable=False)
     original_filename = Column(String(255))
     file_path = Column(String(512), nullable=False)
     content_type = Column(String(100))
     is_main = Column(Boolean, default=False)
     order_index = Column(Integer, default=0)
-    status = Column(Enum(ImageStatus), nullable=False, default=ImageStatus.ACTIVE)
+    status = Column(SQLAlchemyEnum(ImageStatus, name="imagestatus", create_type=True, values_callable=lambda enum: [e.value for e in enum]), nullable=False, default=ImageStatus.ACTIVE.value)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
@@ -179,3 +197,87 @@ class Image(Base):
     __table_args__ = (
         Index('idx_images_entity_type', 'entity_id', 'type'),
     ) 
+
+class Chat(Base):
+    """
+    Модель чата между покупателем и продавцом
+    """
+    __tablename__ = "chats"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    buyer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    seller_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Связи
+    buyer = relationship("User", foreign_keys=[buyer_id], backref="buyer_chats")
+    seller = relationship("User", foreign_keys=[seller_id], backref="seller_chats")
+    messages = relationship("ChatMessage", back_populates="chat", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Chat(id={self.id}, buyer_id={self.buyer_id}, seller_id={self.seller_id})>"
+
+class ChatMessage(Base):
+    """
+    Модель сообщения в чате
+    """
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    
+    # Связи
+    chat = relationship("Chat", back_populates="messages")
+    sender = relationship("User", backref="sent_messages")
+    
+    def __repr__(self):
+        return f"<ChatMessage(id={self.id}, chat_id={self.chat_id}, sender_id={self.sender_id})>"
+
+     # В споре
+
+class Sale(Base):
+    """
+    Модель продажи товара
+    """
+    __tablename__ = "sales"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="SET NULL"), nullable=False)
+    buyer_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    seller_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=False)
+    
+    # Информация о товаре
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=False)
+    price = Column(Float, nullable=False)
+    currency = Column(String, default="USD", nullable=False)
+    
+    # Статус и время
+    status = Column(SQLAlchemyEnum(SaleStatus, name='salestatus', native_enum=True, create_type=True, values_callable=lambda enum: [e.value for e in enum]), server_default=SaleStatus.PENDING.value, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Дополнительная информация
+    description = Column(Text, nullable=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True)
+    extra_data = Column(JSON, nullable=True)
+    
+    # Связи
+    transaction = relationship("Transaction", backref="sale")
+    listing = relationship("Listing", backref="sales")
+    buyer = relationship("User", foreign_keys=[buyer_id], backref="purchases")
+    seller = relationship("User", foreign_keys=[seller_id], backref="sales")
+    item = relationship("Item", backref="sales")
+    chat = relationship("Chat", backref="sale")
+
+    def __repr__(self):
+        return f"<Sale(id={self.id}, listing_id={self.listing_id}, status={self.status})>" 
