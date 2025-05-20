@@ -1,6 +1,6 @@
 # Task ID: 6
 # Title: Build wallet and payment integration
-# Status: pending
+# Status: done
 # Dependencies: 5
 # Priority: medium
 # Description: Implement the wallet system with multi-currency support and integrate with Stripe for deposits and withdrawals.
@@ -25,7 +25,7 @@
 6. Security testing for payment flows
 
 # Subtasks:
-## 1. Create wallet data model with multi-currency support [pending]
+## 1. Create wallet data model with multi-currency support [done]
 ### Dependencies: None
 ### Description: Design and implement the core wallet data model that supports multiple currencies and basic transaction functionality
 ### Details:
@@ -35,8 +35,39 @@
 4. Add database indexes for efficient queries
 5. Write unit tests for the models and their relationships
 6. Implement basic validation logic for transactions
+<info added on 2025-05-19T02:57:16.472Z>
+After examining the codebase, I discovered that wallet models already exist in the project but don't support multi-currency functionality within a single wallet. The current implementation creates separate wallets for each currency per user.
 
-## 2. Implement Stripe integration for deposits [pending]
+Key existing files:
+1. `backend/payment-svc/src/models/wallet.py` - Contains Wallet and WalletTransaction models with Currency and WalletStatus enums. Currently has a UniqueConstraint('user_id', 'currency') enforcing single currency per wallet.
+2. `backend/payment-svc/src/schemas/wallet.py` - Contains Pydantic schemas for the API reflecting current model structure.
+3. `backend/payment-svc/src/models/transaction.py` and `backend/payment-svc/src/models/transaction_history.py` - Transaction models related to wallets.
+
+Implementation plan for multi-currency support:
+1. Modify the Wallet model:
+   - Replace single currency and balance fields with a JSON 'balances' field to store multiple currency:amount pairs
+   - Remove the UniqueConstraint('user_id', 'currency')
+   - Add appropriate validation for the balances field
+
+2. Update WalletTransaction model:
+   - Ensure it supports multi-currency operations
+   - Add or modify currency field to track which currency is involved in each transaction
+
+3. Update Pydantic schemas in wallet.py to reflect model changes
+
+4. Create database migration scripts to:
+   - Add the new balances JSON field
+   - Migrate existing wallet data to the new structure
+   - Remove old currency and balance fields
+
+5. Update related services that interact with wallets and transactions
+
+6. Implement and test validation logic for multi-currency transactions
+
+7. Update unit tests to cover the new multi-currency functionality
+</info added on 2025-05-19T02:57:16.472Z>
+
+## 2. Implement Stripe integration for deposits [done]
 ### Dependencies: 6.1
 ### Description: Connect the application with Stripe API to allow users to deposit funds into their wallet
 ### Details:
@@ -50,7 +81,7 @@
 8. Handle failed payments with appropriate error messages
 9. Add logging for all Stripe interactions
 
-## 3. Develop withdrawal functionality with verification [pending]
+## 3. Develop withdrawal functionality with verification [done]
 ### Dependencies: 6.1, 6.2
 ### Description: Implement secure withdrawal process with verification steps and Stripe payout integration
 ### Details:
@@ -64,7 +95,7 @@
 8. Create email notifications for withdrawal status changes
 9. Implement security measures like IP tracking and unusual activity detection
 
-## 4. Add currency conversion and fee calculation [pending]
+## 4. Add currency conversion and fee calculation [done]
 ### Dependencies: 6.1
 ### Description: Implement currency conversion functionality and transaction fee calculation system
 ### Details:
@@ -78,7 +109,7 @@
 8. Add detailed fee breakdown in transaction history
 9. Write comprehensive tests for conversion edge cases
 
-## 5. Build wallet UI and admin management tools [pending]
+## 5. Build wallet UI and admin management tools [done]
 ### Dependencies: 6.1, 6.2, 6.3, 6.4
 ### Description: Create user interface components for wallet management and admin tools for oversight
 ### Details:

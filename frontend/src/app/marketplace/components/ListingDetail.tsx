@@ -8,7 +8,15 @@ import { useMarketplace } from '../../hooks/marketplace';
 import { useAuth } from '../../hooks/auth';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import formatPrice from '../../utils/formatPrice';
 import ListingCard from './ListingCard';
+import { Card, Button, Typography, Modal, Input, Avatar, List, Divider, message, Spin, Tabs, Tooltip } from 'antd';
+import { SendOutlined, UserOutlined, ShoppingCartOutlined, CloseCircleOutlined, CheckCircleOutlined, InfoCircleOutlined, QuestionCircleOutlined, MessageOutlined } from '@ant-design/icons';
+import BuyButton from '../../components/BuyButton';
+
+const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
+const { TabPane } = Tabs;
 
 interface ListingDetailProps {
   listingId: number;
@@ -92,6 +100,17 @@ interface Listing {
   seller_rating?: number;
 }
 
+// Интерфейс для сообщения чата
+interface ChatMessage {
+  id: number;
+  senderId: number;
+  senderName: string;
+  receiverId: number;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
 export default function ListingDetail({ listingId }: ListingDetailProps) {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
@@ -102,9 +121,18 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [messageText, setMessageText] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [currentTransaction, setCurrentTransaction] = useState<any>(null);
+  const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
+  const [isLoadingTransaction, setIsLoadingTransaction] = useState(false);
   
   // Используем ref для предотвращения циклических запросов данных
   const dataLoadedRef = useRef<boolean>(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Загрузка данных объявления
   useEffect(() => {
@@ -192,6 +220,214 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
     };
   }, [listingId, getListingById]);
   
+  // Скролл чата вниз при добавлении новых сообщений
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+  
+  // Загрузка истории сообщений
+  const loadChatHistory = async (sellerId: number) => {
+    if (!user || !isAuthenticated) {
+      message.error('Для использования чата необходимо авторизоваться');
+      return;
+    }
+    
+    setLoadingMessages(true);
+    
+    try {
+      // В реальном приложении здесь будет вызов API для получения истории сообщений
+      // const response = await fetch(`/api/chat/history?sellerId=${sellerId}`);
+      // const data = await response.json();
+      
+      // Временная заглушка для демонстрации
+      const mockMessages: ChatMessage[] = [
+        {
+          id: 1,
+          senderId: user?.id || 0,
+          senderName: user?.username || 'Вы',
+          receiverId: sellerId,
+          message: 'Здравствуйте! Меня интересует ваш товар. Он ещё доступен?',
+          timestamp: new Date(Date.now() - 86400000).toISOString(), // 24 часа назад
+          isRead: true
+        },
+        {
+          id: 2,
+          senderId: sellerId,
+          senderName: listing?.seller?.username || 'Продавец',
+          receiverId: user?.id || 0,
+          message: 'Добрый день! Да, товар в наличии и готов к продаже.',
+          timestamp: new Date(Date.now() - 82800000).toISOString(), // 23 часа назад
+          isRead: true
+        },
+        {
+          id: 3,
+          senderId: user?.id || 0,
+          senderName: user?.username || 'Вы',
+          receiverId: sellerId,
+          message: 'Отлично! У меня есть несколько вопросов о товаре...',
+          timestamp: new Date(Date.now() - 43200000).toISOString(), // 12 часов назад
+          isRead: true
+        },
+        {
+          id: 4,
+          senderId: sellerId,
+          senderName: listing?.seller?.username || 'Продавец',
+          receiverId: user?.id || 0,
+          message: 'Конечно, спрашивайте! Я готов ответить на любые вопросы по товару.',
+          timestamp: new Date(Date.now() - 39600000).toISOString(), // 11 часов назад
+          isRead: true
+        }
+      ];
+      
+      setChatMessages(mockMessages);
+    } catch (error) {
+      console.error('Ошибка при загрузке истории сообщений:', error);
+      message.error('Не удалось загрузить историю сообщений');
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+  
+  // Загрузка информации о транзакции, если она есть
+  const loadTransactionInfo = async () => {
+    if (!user || !isAuthenticated || !listing) return;
+    
+    setIsLoadingTransaction(true);
+    
+    try {
+      // В реальном приложении здесь будет вызов API для получения информации о транзакции
+      // const response = await fetch(`/api/transactions/listing/${listingId}`);
+      // const data = await response.json();
+      
+      // Временная заглушка для демонстрации
+      const mockTransaction = {
+        id: 12345,
+        status: 'escrow_held', // pending, escrow_held, completed, refunded, disputed, canceled
+        amount: listing.price,
+        currency: listing.currency,
+        createdAt: new Date(Date.now() - 172800000).toISOString(), // 48 часов назад
+        updatedAt: new Date(Date.now() - 86400000).toISOString() // 24 часа назад
+      };
+      
+      setCurrentTransaction(mockTransaction);
+      setTransactionStatus(mockTransaction.status);
+    } catch (error) {
+      console.error('Ошибка при загрузке информации о транзакции:', error);
+    } finally {
+      setIsLoadingTransaction(false);
+    }
+  };
+  
+  // Отправка сообщения
+  const sendMessage = async () => {
+    if (!messageText.trim() || !user || !isAuthenticated || !listing) {
+      return;
+    }
+    
+    setIsSendingMessage(true);
+    
+    try {
+      // В реальном приложении здесь будет вызов API для отправки сообщения
+      // const response = await fetch('/api/chat/send', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     receiverId: listing.seller.id,
+      //     message: messageText,
+      //     listingId
+      //   }),
+      // });
+      // const data = await response.json();
+      
+      // Временная заглушка для демонстрации
+      const newMessage: ChatMessage = {
+        id: chatMessages.length + 1,
+        senderId: user.id,
+        senderName: user.username,
+        receiverId: listing.seller.id,
+        message: messageText,
+        timestamp: new Date().toISOString(),
+        isRead: false
+      };
+      
+      setChatMessages(prev => [...prev, newMessage]);
+      setMessageText('');
+      
+      // Симулируем ответ продавца через 2 секунды
+      setTimeout(() => {
+        const sellerReply: ChatMessage = {
+          id: chatMessages.length + 2,
+          senderId: listing.seller.id,
+          senderName: listing.seller.username,
+          receiverId: user.id,
+          message: 'Спасибо за сообщение! Я отвечу вам в ближайшее время.',
+          timestamp: new Date().toISOString(),
+          isRead: false
+        };
+        
+        setChatMessages(prev => [...prev, sellerReply]);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Ошибка при отправке сообщения:', error);
+      message.error('Не удалось отправить сообщение');
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+  
+  // Подтверждение получения товара
+  const confirmDelivery = async () => {
+    if (!currentTransaction) return;
+    
+    try {
+      // В реальном приложении здесь будет вызов API для подтверждения получения товара
+      // const response = await fetch(`/api/transactions/${currentTransaction.id}/complete`, {
+      //   method: 'POST'
+      // });
+      // const data = await response.json();
+      
+      // Временная заглушка для демонстрации
+      setTransactionStatus('completed');
+      message.success('Получение товара подтверждено. Средства перечислены продавцу.');
+      
+    } catch (error) {
+      console.error('Ошибка при подтверждении получения:', error);
+      message.error('Не удалось подтвердить получение товара');
+    }
+  };
+  
+  // Запрос помощи поддержки
+  const requestSupport = async () => {
+    if (!currentTransaction) return;
+    
+    try {
+      // В реальном приложении здесь будет вызов API для запроса помощи поддержки
+      // const response = await fetch(`/api/transactions/${currentTransaction.id}/dispute`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     reason: 'Необходима помощь службы поддержки',
+      //   }),
+      // });
+      // const data = await response.json();
+      
+      // Временная заглушка для демонстрации
+      setTransactionStatus('disputed');
+      message.success('Запрос отправлен в службу поддержки. Мы свяжемся с вами в ближайшее время.');
+      
+    } catch (error) {
+      console.error('Ошибка при запросе поддержки:', error);
+      message.error('Не удалось отправить запрос в службу поддержки');
+    }
+  };
+  
   // Обработчики
   const handleEdit = () => {
     router.push(`/marketplace/listings/edit/${listingId}`);
@@ -211,8 +447,123 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
     }
   };
   
+  // Обработчик контакта с продавцом
   const handleContactSeller = () => {
-    // TODO: Реализовать функцию контакта с продавцом
+    if (!isAuthenticated) {
+      message.error('Для контакта с продавцом необходимо авторизоваться');
+      router.push('/login');
+      return;
+    }
+    
+    if (listing && listing.seller) {
+      // Загружаем историю сообщений и информацию о транзакции
+      loadChatHistory(listing.seller.id);
+      loadTransactionInfo();
+      setIsChatModalOpen(true);
+    }
+  };
+  
+  // Рендер статуса транзакции
+  const renderTransactionStatus = () => {
+    if (isLoadingTransaction) {
+      return <Spin size="small" />;
+    }
+    
+    if (!currentTransaction) {
+      return <Text type="secondary">Транзакция не найдена</Text>;
+    }
+    
+    let statusColor = 'default';
+    let statusText = 'Неизвестно';
+    
+    switch (transactionStatus) {
+      case 'pending':
+        statusColor = 'warning';
+        statusText = 'Ожидание оплаты';
+        break;
+      case 'escrow_held':
+        statusColor = 'processing';
+        statusText = 'Ожидание доставки';
+        break;
+      case 'completed':
+        statusColor = 'success';
+        statusText = 'Завершено';
+        break;
+      case 'refunded':
+        statusColor = 'default';
+        statusText = 'Возврат средств';
+        break;
+      case 'disputed':
+        statusColor = 'error';
+        statusText = 'В процессе разрешения спора';
+        break;
+      case 'canceled':
+        statusColor = 'default';
+        statusText = 'Отменено';
+        break;
+    }
+    
+    return (
+      <div>
+        <Text strong>Статус сделки: </Text>
+        <Text type={statusColor as any}>{statusText}</Text>
+      </div>
+    );
+  };
+  
+  // Рендер действий в зависимости от статуса транзакции
+  const renderTransactionActions = () => {
+    if (!currentTransaction || isLoadingTransaction) {
+      return null;
+    }
+    
+    switch (transactionStatus) {
+      case 'escrow_held':
+        return (
+          <div className="mt-4 space-y-2">
+            <Button 
+              type="primary" 
+              icon={<CheckCircleOutlined />}
+              onClick={confirmDelivery}
+              block
+            >
+              Подтвердить получение товара
+            </Button>
+            <Button 
+              danger
+              icon={<QuestionCircleOutlined />}
+              onClick={requestSupport}
+              block
+            >
+              Запросить помощь поддержки
+            </Button>
+          </div>
+        );
+      case 'disputed':
+        return (
+          <div className="mt-4">
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <Text type="warning">
+                <InfoCircleOutlined className="mr-1" />
+                Запрос в службу поддержки отправлен. Ожидайте ответа.
+              </Text>
+            </div>
+          </div>
+        );
+      case 'completed':
+        return (
+          <div className="mt-4">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <Text type="success">
+                <CheckCircleOutlined className="mr-1" />
+                Транзакция успешно завершена!
+              </Text>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
   
   // Отображение хлебных крошек с иерархией категорий
@@ -513,119 +864,42 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
         
         {/* Информация о цене и продавце */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm p-6 sticky top-4">
-            <h1 className="text-2xl font-bold mb-4">{listing.title}</h1>
-            
-            <div className="text-3xl font-bold text-blue-600 mb-4">
-              {new Intl.NumberFormat('ru-RU', {
-                style: 'currency',
-                currency: listing.currency,
-                maximumFractionDigits: 2
-              }).format(listing.price)}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                {formatPrice(listing.price, listing.currency)}
+              </h2>
+              <div className="text-sm text-gray-500">
+                Размещено {formatDistanceToNow(createdAtDate, { addSuffix: true, locale: ru })}
+            </div>
             </div>
             
-            <div className="text-sm text-gray-500 mb-6">
-              Размещено: {formatDistanceToNow(createdAtDate, { addSuffix: true, locale: ru })}
-              <br />
-              Просмотров: {listing.views_count || 0}
-            </div>
-            
-            {!isOwner && (
-              <button
-                onClick={handleContactSeller}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded mb-4 transition"
-              >
-                Связаться с продавцом
-              </button>
+            {!isOwner && listing.status === 'active' && (
+              <BuyButton
+                listingId={listing.id}
+                price={listing.price}
+                currency={listing.currency}
+                sellerId={listing.seller.id}
+              />
             )}
             
             {isOwner && (
-              <div className="flex flex-col space-y-3">
+              <div className="space-y-4">
                 <button
-                  onClick={handleEdit}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded transition flex items-center justify-center"
+                  onClick={() => router.push(`/marketplace/listings/${listing.id}/edit`)}
+                  className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
                   Редактировать
                 </button>
-                
                 <button
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="w-full bg-red-100 hover:bg-red-200 text-red-700 font-bold py-3 px-4 rounded transition flex items-center justify-center"
+                  className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
                   Удалить
                 </button>
               </div>
             )}
-            
-            <div className="border-t mt-6 pt-6">
-              <h3 className="font-semibold mb-2">Продавец</h3>
-              <div className="flex items-center">
-                {listing.seller?.avatar_url ? (
-                  <Image
-                    src={listing.seller.avatar_url}
-                    alt={listing.seller.username}
-                    width={40}
-                    height={40}
-                    className="rounded-full mr-3"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gray-300 mr-3 flex items-center justify-center">
-                    <span className="text-gray-600">{listing.seller?.username.charAt(0).toUpperCase()}</span>
                   </div>
-                )}
-                <div>
-                  <div className="font-medium">{listing.seller?.username}</div>
-                  {listing.seller?.rating && (
-                    <div className="flex items-center text-sm">
-                      <span className="text-yellow-400 mr-1">★</span>
-                      <span>{listing.seller.rating.toFixed(1)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Шаблон предмета и категория */}
-            <div className="border-t mt-6 pt-6">
-              <h3 className="font-semibold mb-2">Информация о предмете</h3>
-              <div className="text-sm">
-                {listing.item_template && (
-                  <div className="mb-2">
-                    <span className="text-gray-600">Шаблон:</span> {listing.item_template.name}
-                  </div>
-                )}
-                
-                {(listing.item_template?.category || listing.category) && (
-                  <div className="mb-2">
-                    <span className="text-gray-600">Категория:</span> {listing.item_template?.category?.name || listing.category?.name}
-                  </div>
-                )}
-                
-                {listing.status && (
-                  <div className="mt-2">
-                    <span className="text-gray-600">Статус:</span>{' '}
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      listing.status === 'active' ? 'bg-green-100 text-green-800' :
-                      listing.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {listing.status === 'active' ? 'Активно' :
-                       listing.status === 'pending' ? 'На модерации' :
-                       listing.status === 'sold' ? 'Продано' : 
-                       listing.status === 'cancelled' ? 'Отменено' : 
-                       listing.status}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       
@@ -697,6 +971,134 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
           </div>
         </div>
       )}
+      
+      {/* Добавляем модальное окно чата */}
+      <Modal
+        title={`Чат с продавцом: ${listing?.seller?.username || 'Продавец'}`}
+        open={isChatModalOpen}
+        onCancel={() => setIsChatModalOpen(false)}
+        footer={null}
+        width={800}
+      >
+        <div className="flex flex-col md:flex-row h-[500px] gap-4">
+          {/* Левая панель с информацией о товаре и статусе сделки */}
+          <div className="w-full md:w-1/3 p-4 border rounded-md overflow-y-auto">
+            <div className="mb-4">
+              <Title level={5}>Информация о товаре</Title>
+              <div className="mb-2 relative h-48">
+                <Image 
+                  src={listing?.images?.[0]?.url || '/placeholder-image.jpg'} 
+                  alt={listing?.title || 'Товар'} 
+                  fill
+                  className="object-cover rounded-md"
+                />
+              </div>
+              <Text strong>{listing?.title}</Text>
+              <div>
+                <Text type="secondary">{listing?.price} {listing?.currency}</Text>
+              </div>
+            </div>
+            
+            <Divider />
+            
+            <div className="mb-4">
+              <Title level={5}>Статус сделки</Title>
+              {renderTransactionStatus()}
+              {renderTransactionActions()}
+            </div>
+          </div>
+          
+          {/* Правая панель с чатом */}
+          <div className="w-full md:w-2/3 flex flex-col border rounded-md">
+            {/* Сообщения чата */}
+            <div className="flex-grow p-4 overflow-y-auto">
+              {loadingMessages ? (
+                <div className="flex justify-center items-center h-full">
+                  <Spin tip="Загрузка сообщений..." />
+                </div>
+              ) : chatMessages.length === 0 ? (
+                <div className="flex justify-center items-center h-full text-gray-400">
+                  <div className="text-center">
+                    <div className="mb-2">
+                      <MessageOutlined style={{ fontSize: '2rem' }} />
+                    </div>
+                    <Text type="secondary">Нет сообщений</Text>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chatMessages.map((msg) => (
+                    <div 
+                      key={msg.id} 
+                      className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[70%] p-3 rounded-lg ${
+                          msg.senderId === user?.id 
+                            ? 'bg-blue-500 text-white rounded-br-none' 
+                            : 'bg-gray-100 rounded-bl-none'
+                        }`}
+                      >
+                        <div className="flex items-center mb-1">
+                          <Text 
+                            strong 
+                            style={{ 
+                              color: msg.senderId === user?.id ? 'white' : 'inherit',
+                              marginRight: '8px'
+                            }}
+                          >
+                            {msg.senderId === user?.id ? 'Вы' : msg.senderName}
+                          </Text>
+                          <Text 
+                            type="secondary" 
+                            style={{ 
+                              fontSize: '0.75rem',
+                              color: msg.senderId === user?.id ? 'rgba(255,255,255,0.7)' : undefined 
+                            }}
+                          >
+                            {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </Text>
+                        </div>
+                        <div>{msg.message}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
+            
+            {/* Ввод сообщения */}
+            <div className="p-3 border-t">
+              <div className="flex">
+                <TextArea 
+                  placeholder="Введите сообщение..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onPressEnter={(e) => {
+                    if (!e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  disabled={isSendingMessage}
+                  className="flex-grow mr-2"
+                />
+                <Button 
+                  type="primary" 
+                  icon={<SendOutlined />}
+                  onClick={sendMessage}
+                  loading={isSendingMessage}
+                />
+              </div>
+              <Text type="secondary" className="text-xs mt-1">
+                Нажмите Shift+Enter для переноса строки
+              </Text>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 } 

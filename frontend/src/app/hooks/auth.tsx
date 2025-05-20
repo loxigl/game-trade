@@ -34,6 +34,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   register: (userData: RegisterUserData) => Promise<void>;
   refreshToken: () => Promise<boolean>;
+  getAuthHeader: () => string | null;
 }
 
 // Создаем интерфейс для данных регистрации
@@ -184,6 +185,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Сохраняем токены
       localStorage.setItem('accessToken', data.access_token);
       localStorage.setItem('refreshToken', data.refresh_token);
+      // Также сохраняем access_token как 'token' для совместимости с HTTP-клиентом
+      localStorage.setItem('token', data.access_token);
 
       // Загружаем данные пользователя
       await fetchUserData();
@@ -217,6 +220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Очищаем локальное состояние и хранилище
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('token');
       setUser(null);
       setUserPermissions(null);
       setUIPermissions(null);
@@ -283,18 +287,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!response.ok) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('token');
         return false;
       }
 
       const data = await response.json();
       localStorage.setItem('accessToken', data.access_token);
       localStorage.setItem('refreshToken', data.refresh_token);
+      // Обновляем также дублирующий токен для совместимости с HTTP-клиентом
+      localStorage.setItem('token', data.access_token);
       return true;
 
     } catch (error) {
       console.error('Token refresh error:', error);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('token');
       return false;
     }
   };
@@ -314,7 +322,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     register,
-    refreshToken
+    refreshToken,
+    getAuthHeader: () => {
+      const token = localStorage.getItem('accessToken');
+      return token ? `Bearer ${token}` : null;
+    }
   };
 
   return (

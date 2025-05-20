@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     VERSION: str = "0.1.0"
     
+    # Тестовый режим
+    TEST_MODE: bool = False  # Включает тестовые функции, такие как автоматическая генерация transaction_id
+    
     # Настройки базы данных
     DATABASE_URL: str
     
@@ -41,6 +44,8 @@ class Settings(BaseSettings):
     RABBITMQ_EXCHANGE: str = "marketplace"
     RABBITMQ_IMAGES_QUEUE: str = "marketplace_images"
     RABBITMQ_IMAGES_ROUTING_KEY: str = "images"
+    RABBITMQ_SALES_QUEUE: str = "marketplace_sales"
+    RABBITMQ_SALES_ROUTING_KEY: str = "sales.created"
     
     class Config:
         """Конфигурация настроек"""

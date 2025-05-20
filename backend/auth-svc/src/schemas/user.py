@@ -92,6 +92,7 @@ class TokenValidateResponse(BaseModel):
     is_valid: bool
     user_id: Optional[int] = None
     username: Optional[str] = None
+    email: Optional[EmailStr] = None
     
     class Config:
         schema_extra = {

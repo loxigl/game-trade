@@ -27,7 +27,7 @@ engine = create_engine(
     pool_size=DB_POOL_SIZE,
     max_overflow=DB_MAX_OVERFLOW,
     pool_timeout=DB_POOL_TIMEOUT,
-    echo=DEBUG
+
 )
 
 # Создаем фабрику сессий
@@ -48,7 +48,7 @@ ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg:/
 
 async_engine = create_async_engine(
     ASYNC_DATABASE_URL,
-    echo=DEBUG
+
 )
 
 AsyncSessionLocal = sessionmaker(

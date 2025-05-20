@@ -8,7 +8,16 @@ from .routes.register import router as register_router
 from .routes.account import router as account_router
 from .routes.roles import router as roles_router
 from .routes.permissions import router as permissions_router
+from .services.rabbitmq_service import get_rabbitmq_service
+import logging
 from sqlalchemy import text
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="GameTrade Authentication Service",
@@ -56,6 +65,33 @@ app.include_router(register_router)
 app.include_router(account_router)
 app.include_router(roles_router)
 app.include_router(permissions_router)
+
+@app.on_event("startup")
+async def startup_event():
+    """
+    Выполняется при запуске приложения
+    Инициализирует соединение с RabbitMQ
+    """
+    # Инициализация соединения с RabbitMQ
+    try:
+        rabbitmq_service = get_rabbitmq_service()
+        await rabbitmq_service.connect()
+        logger.info("Successfully connected to RabbitMQ")
+    except Exception as e:
+        logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Выполняется при остановке приложения
+    Закрывает соединение с RabbitMQ
+    """
+    try:
+        rabbitmq_service = get_rabbitmq_service()
+        await rabbitmq_service.close()
+        logger.info("RabbitMQ connection closed")
+    except Exception as e:
+        logger.error(f"Error closing RabbitMQ connection: {str(e)}")
 
 @app.get("/", tags=["root"])
 async def root():

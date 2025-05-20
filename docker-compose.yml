@@ -150,6 +150,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DATABASE_URL=postgresql://gametrade:gametrade@postgres-auth:5432/auth_db
       - REDIS_URL=redis://redis:6379/0
        JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
@@ -183,6 +184,7 @@ services:
       auth-svc:
         condition: service_healthy
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DATABASE_URL=postgresql://gametrade:gametrade@postgres-marketplace:5432/marketplace_db
       - REDIS_URL=redis://redis:6379/1
       - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
@@ -215,10 +217,12 @@ services:
       auth-svc:
         condition: service_healthy
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DATABASE_URL=postgresql://gametrade:gametrade@postgres-payment:5432/payment_db
       - REDIS_URL=redis://redis:6379/2
       - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
       - AUTH_SERVICE_URL=http://auth-svc:8000
+      - MARKETPLACE_SERVICE_URL=http://marketplace-svc:8001
       - ENVIRONMENT=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
@@ -246,6 +250,7 @@ services:
       auth-svc:
         condition: service_healthy
     environment:
+      - PYTHONDONTWRITEBYTECODE=1
       - DATABASE_URL=postgresql://gametrade:gametrade@postgres-chat:5432/chat_db
       - REDIS_URL=redis://redis:6379/3
       - RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
@@ -267,7 +272,7 @@ services:
         - NEXT_PUBLIC_API_URL=http://localhost/api
         - NEXT_PUBLIC_AUTH_URL=http://localhost/api/auth
         - NEXT_PUBLIC_MARKETPLACE_URL=http://localhost/api/marketplace
-        - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payment
+        - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payments
         - NEXT_PUBLIC_CHAT_URL=http://localhost/api/chat
         - PORT=3000
         - NEXT_PUBLIC_SHOW_DETAILED_ERRORS=true
@@ -278,7 +283,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost/api
       - NEXT_PUBLIC_AUTH_URL=http://localhost/api/auth
       - NEXT_PUBLIC_MARKETPLACE_URL=http://localhost/api/marketplace
-      - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payment
+      - NEXT_PUBLIC_PAYMENT_URL=http://localhost/api/payments
       - NEXT_PUBLIC_CHAT_URL=http://localhost/api/chat
     depends_on:
       - auth-svc

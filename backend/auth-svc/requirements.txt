@@ -15,4 +15,5 @@ pytest-asyncio==0.23.5
 pydantic[email]==2.6.3
 redis==5.0.0
 python-dotenv==1.0.1
+aio-pika==9.3.1
 

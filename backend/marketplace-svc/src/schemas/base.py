@@ -7,6 +7,7 @@ class PaginationParams(BaseModel):
     """Параметры пагинации для API"""
     page: int = Field(1, ge=1, description="Номер страницы (от 1)")
     limit: int = Field(20, ge=1, le=100, description="Количество элементов на странице (от 1 до 100)")
+    
 
     @computed_field
     @property

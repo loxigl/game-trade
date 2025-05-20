@@ -9,16 +9,23 @@ import httpx
 import time
 import logging
 import asyncio
+import traceback
 from typing import Dict, List
 
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 # Импорт роутеров
-from .routers import listings, categories, games, search, images, templates
+from .routers import listings, categories, games, search, images, templates, sales, statistics
 from .dependencies.db import get_db
 from .config.settings import get_settings
 from .services.image_processor import ImageProcessor
-
-# Настройка логирования
-logger = logging.getLogger(__name__)
+from .services.rabbitmq_service import get_rabbitmq_service
+from .services.message_handler import setup_rabbitmq_consumers
 
 # Конфигурация сервисов
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-svc:8000")
@@ -55,6 +62,8 @@ app.include_router(games)
 app.include_router(search)
 app.include_router(images)
 app.include_router(templates)
+app.include_router(sales)
+app.include_router(statistics)
 
 # Создание экземпляра обработчика изображений
 image_processor = ImageProcessor()
@@ -62,13 +71,47 @@ image_processor = ImageProcessor()
 @app.on_event("startup")
 async def startup_event():
     """
-    Запуск обработчика изображений при старте приложения
+    Запуск обработчика изображений и инициализация RabbitMQ при старте приложения
     """
     try:
         # Запускаем обработчик изображений в фоновом режиме
         asyncio.create_task(image_processor.start_consumer())
+        
+        # Инициализируем соединение с RabbitMQ
+        logger.info("Attempting to connect to RabbitMQ...")
+        rabbitmq_service = get_rabbitmq_service()
+        try:
+            await rabbitmq_service.connect()
+            logger.info("Successfully connected to RabbitMQ")
+            
+            # Настраиваем потребителей сообщений
+            try:
+                logger.info("Setting up RabbitMQ consumers...")
+                await setup_rabbitmq_consumers()
+                logger.info("RabbitMQ consumers are set up")
+            except Exception as consumer_error:
+                logger.error(f"Error setting up RabbitMQ consumers: {str(consumer_error)}")
+                logger.error(traceback.format_exc())
+        except Exception as connect_error:
+            logger.error(f"Error connecting to RabbitMQ: {str(connect_error)}")
+            logger.error(traceback.format_exc())
     except Exception as e:
-        print(f"Ошибка при запуске обработчика изображений: {str(e)}")
+        logger.error(f"Error initializing services: {str(e)}")
+        logger.error(traceback.format_exc())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Закрытие подключений при остановке приложения
+    """
+    try:
+        # Закрываем соединение с RabbitMQ
+        rabbitmq_service = get_rabbitmq_service()
+        await rabbitmq_service.close()
+        logger.info("RabbitMQ connection closed")
+    except Exception as e:
+        logger.error(f"Error closing RabbitMQ connection: {str(e)}")
+        logger.error(traceback.format_exc())
 
 @app.get("/")
 async def root():

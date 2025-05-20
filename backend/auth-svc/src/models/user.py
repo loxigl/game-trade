@@ -1,3 +1,4 @@
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, ARRAY
 from sqlalchemy.sql import expression
 from datetime import datetime
@@ -20,7 +21,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Новые поля для управления ролями и безопасностью
-    roles = Column(ARRAY(String), server_default="{'user'}", nullable=False)
+    roles = Column(MutableList.as_mutable(ARRAY(String)), server_default="{'user'}", nullable=False)
     last_password_change = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     failed_login_attempts = Column(Integer, server_default="0", nullable=False)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)

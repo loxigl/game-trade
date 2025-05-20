@@ -1,5 +1,18 @@
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+import os
+import asyncio
+
+from .services.rabbitmq_service import get_rabbitmq_service
+from .services.message_handler import setup_rabbitmq_consumers
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="GameTrade Chat Service",
@@ -16,13 +29,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """
+    Выполняется при запуске приложения
+    Инициализирует соединение с RabbitMQ и настраивает потребителей сообщений
+    """
+    try:
+        # Инициализация соединения с RabbitMQ
+        rabbitmq_service = get_rabbitmq_service()
+        await rabbitmq_service.connect()
+        logger.info("Successfully connected to RabbitMQ")
+        
+        # Настройка потребителей сообщений
+        await setup_rabbitmq_consumers()
+        logger.info("RabbitMQ consumers are set up")
+    except Exception as e:
+        logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """
+    Выполняется при остановке приложения
+    Закрывает соединение с RabbitMQ
+    """
+    try:
+        rabbitmq_service = get_rabbitmq_service()
+        await rabbitmq_service.close()
+        logger.info("RabbitMQ connection closed")
+    except Exception as e:
+        logger.error(f"Error closing RabbitMQ connection: {str(e)}")
+
 @app.get("/")
 async def root():
     return {"message": "Chat Service API"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "chat"}
 
 class ConnectionManager:
     def __init__(self):

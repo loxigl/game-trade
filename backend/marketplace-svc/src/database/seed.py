@@ -719,7 +719,7 @@ async def seed_attributes(db: AsyncSession, categories: dict) -> dict:
                 db.add(attribute)
                 await db.flush()
                 created_attributes[f"{category.id}_{attribute.name}"] = attribute
-            print(f"Создан атрибут категории: {attribute.name} для категории {category.name}")
+        print(f"Создан атрибут категории: {attribute.name} для категории {category.name}")
     
     await db.commit()
     return created_attributes
@@ -976,11 +976,11 @@ async def seed_templates(db: AsyncSession, categories: dict) -> dict:
             
             # Создаем шаблоны
             for template_data in templates_for_category:
-            template = ItemTemplate(category_id=category.id, **template_data)
-            db.add(template)
-            await db.flush()
-            created_templates[template.name] = template
-            print(f"Создан шаблон предмета: {template.name} для категории {category_name}")
+                template = ItemTemplate(category_id=category.id, **template_data)
+                db.add(template)
+                await db.flush()
+                created_templates[template.name] = template
+                print(f"Создан шаблон предмета: {template.name} для категории {category_name}")
         else:
             print(f"Для категории {category_name} не найдено шаблонов в списке, пропускаем...")
 
@@ -1556,11 +1556,11 @@ async def seed_listings(db: AsyncSession, items: dict, users: dict) -> None:
 
     # Статусы для объявлений с небольшой вариацией
     statuses = [
-        ListingStatus.ACTIVE,
-        ListingStatus.ACTIVE,
-        ListingStatus.ACTIVE,
-        ListingStatus.PENDING,
-        ListingStatus.ACTIVE
+        ListingStatus.ACTIVE.value,
+        ListingStatus.ACTIVE.value,
+        ListingStatus.ACTIVE.value,
+        ListingStatus.PENDING.value,
+        ListingStatus.ACTIVE.value
     ]
 
     # Валюты для объявлений
@@ -1652,7 +1652,7 @@ async def seed_listings(db: AsyncSession, items: dict, users: dict) -> None:
         )
         db.add(listing)
         await db.flush()
-        print(f"Создано объявление: {template.name} ({game.name if game else 'Неизвестная игра'}) с ценой {listing.price} {listing.currency}, статус: {status.name}")
+        print(f"Создано объявление: {template.name} ({game.name if game else 'Неизвестная игра'}) с ценой {listing.price} {listing.currency}, статус: {status}")
     
     await db.commit()
 
@@ -1785,7 +1785,7 @@ async def seed_images(db: AsyncSession, users: dict) -> None:
                 file_path=f"/uploads/{image_name}.jpg",
                 content_type="image/jpeg",
                 is_main=is_main,
-                status=ImageStatus.ACTIVE,
+                status=ImageStatus.ACTIVE.value,
                 order_index=i
             )
             db.add(listing_image)
@@ -1807,7 +1807,7 @@ async def seed_images(db: AsyncSession, users: dict) -> None:
                 file_path=f"/uploads/item_{item.id}.jpg",
                 content_type="image/jpeg",
                 is_main=True,
-                status=ImageStatus.ACTIVE,
+                status=ImageStatus.ACTIVE.value,
                 order_index=0
             )
             db.add(item_image)
@@ -1828,7 +1828,7 @@ async def seed_images(db: AsyncSession, users: dict) -> None:
             file_path=f"/uploads/{game.name.lower().replace(' ', '_').replace(':', '')}_logo.jpg",
             content_type="image/jpeg",
             is_main=True,
-            status=ImageStatus.ACTIVE,
+            status=ImageStatus.ACTIVE.value,
             order_index=0
         )
         db.add(game_image)
@@ -1849,7 +1849,7 @@ async def seed_images(db: AsyncSession, users: dict) -> None:
             file_path=f"/uploads/category_{category.id}.jpg",
             content_type="image/jpeg",
             is_main=True,
-            status=ImageStatus.ACTIVE,
+            status=ImageStatus.ACTIVE.value,
             order_index=0
         )
         db.add(category_image)
@@ -1870,7 +1870,7 @@ async def seed_images(db: AsyncSession, users: dict) -> None:
             file_path=f"/uploads/template_{template.id}.jpg",
             content_type="image/jpeg",
             is_main=True,
-            status=ImageStatus.ACTIVE,
+            status=ImageStatus.ACTIVE.value,
             order_index=0
         )
         db.add(template_image)
