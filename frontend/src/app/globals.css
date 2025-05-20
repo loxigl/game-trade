@@ -1,0 +1,351 @@
+@import "tailwindcss";
+
+:root:not(.dark) {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --form-bg: #f9fafb;
+  --form-input-bg: #ffffff;
+  --text-primary: #171717;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-inverted: #ffffff;
+}
+
+.dark {
+  --background: #121212;
+  --foreground: #f3f4f6;
+  --primary: #3b82f6;
+  --primary-light: #60a5fa;
+  --primary-dark: #2563eb;
+  --card-bg: #1e1e1e;
+  --card-border: #2d2d2d;
+  --form-bg: #1a1a1a;
+  --form-input-bg: #2a2a2a;
+  --text-primary: #f3f4f6;
+  --text-secondary: #e5e7eb;
+  --text-tertiary: #d1d5db;
+  --text-inverted: #171717;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.dark h1, 
+.dark h2, 
+.dark h3, 
+.dark h4, 
+.dark h5, 
+.dark h6 {
+  color: var(--text-primary);
+}
+
+.dark .text-gray-700,
+.dark .text-gray-800,
+.dark .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-gray-600 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-gray-400,
+.dark .text-gray-500 {
+  color: var(--text-tertiary) !important;
+}
+
+/* Улучшаем стили для карточек и контейнеров в темной теме */
+.dark .bg-white, 
+.dark .bg-gray-50 {
+  background-color: var(--card-bg) !important;
+}
+
+/* Улучшаем стили для форм */
+.dark .p-4.bg-gray-50 {
+  background-color: var(--form-bg) !important;
+}
+
+/* Стили для компонентов Ant Design в темной теме */
+.dark .ant-card {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-input,
+.dark .ant-select-selector,
+.dark .ant-picker,
+.dark .ant-input-affix-wrapper {
+  background-color: var(--form-input-bg) !important;
+  border-color: var(--card-border) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-select-dropdown,
+.dark .ant-picker-dropdown,
+.dark .ant-picker-panel-container {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-select-item,
+.dark .ant-picker-cell {
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-select-item-option-selected,
+.dark .ant-picker-cell-selected > .ant-picker-cell-inner {
+  background-color: var(--primary-dark) !important;
+  color: var(--text-inverted) !important;
+}
+
+/* Стили для типографики Ant Design */
+.dark .ant-typography, 
+.dark .ant-typography h1, 
+.dark .ant-typography h2, 
+.dark .ant-typography h3, 
+.dark .ant-typography h4, 
+.dark .ant-typography h5 {
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-typography.ant-typography-secondary {
+  color: var(--text-secondary) !important;
+}
+
+/* Улучшаем видимость границ в темной теме */
+.dark .border, 
+.dark .border-gray-200 {
+  border-color: var(--card-border) !important;
+}
+
+/* Улучшаем контрастность кнопок */
+.dark .bg-blue-500, 
+.dark .bg-blue-600 {
+  background-color: var(--primary) !important;
+}
+
+.dark .hover\:bg-blue-600:hover, 
+.dark .hover\:bg-blue-700:hover {
+  background-color: var(--primary-dark) !important;
+}
+
+/* Исправляем видимость текста в формах */
+.dark label {
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-form-item-label > label {
+  color: var(--text-primary) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Исправляем видимость текста в навигации */
+.dark nav a {
+  color: var(--text-secondary);
+}
+
+.dark nav a:hover,
+.dark nav a.border-blue-500 {
+  color: var(--primary-light);
+}
+
+/* Улучшаем стили для выпадающих меню */
+.dark .ant-dropdown-menu {
+  background-color: var(--card-bg) !important;
+}
+
+.dark .ant-dropdown-menu-item {
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-dropdown-menu-item:hover {
+  background-color: var(--form-bg) !important;
+}
+
+/* Улучшение контрастности для Alert компонентов */
+.dark .ant-alert-success {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.dark .ant-alert-info {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.dark .ant-alert-warning {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.dark .ant-alert-error {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Улучшение контрастности для модальных окон */
+.dark .ant-modal-content,
+.dark .ant-modal-header {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-modal-title,
+.dark .ant-modal-close {
+  color: var(--text-primary) !important;
+}
+
+/* Стили для таблиц */
+.dark .ant-table {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-table-thead > tr > th {
+  background-color: var(--form-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-table-tbody > tr > td {
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-table-tbody > tr.ant-table-row:hover > td {
+  background-color: var(--form-bg) !important;
+}
+
+/* Улучшение стилей для Timeline */
+.dark .ant-timeline-item-tail {
+  border-left-color: var(--card-border) !important;
+}
+
+.dark .ant-timeline-item-head {
+  background-color: var(--background) !important;
+}
+
+/* Улучшение стилей для меню и кнопок в Ant Design */
+.dark .ant-btn {
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-btn-default {
+  background-color: var(--form-input-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.dark .ant-btn-primary:hover {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+
+/* Улучшение отображения карточек транзакций */
+.dark .transaction-card {
+  border-color: var(--card-border) !important;
+  background-color: var(--card-bg) !important;
+}
+
+.dark .transaction-status {
+  background-color: var(--form-bg) !important;
+}
+
+/* Улучшение стилей пагинации */
+.dark .ant-pagination-item {
+  background-color: var(--form-input-bg) !important;
+  border-color: var(--card-border) !important;
+}
+
+.dark .ant-pagination-item a {
+  color: var(--text-primary) !important;
+}
+
+.dark .ant-pagination-item-active {
+  border-color: var(--primary) !important;
+}
+
+.dark .ant-pagination-item-active a {
+  color: var(--primary-light) !important;
+}
+
+/* Стили для карточек на главной странице */
+.dark .feature-card {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .feature-card:hover {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Принудительное соблюдение темы, независимо от системных предпочтений */
+:root.light {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --form-bg: #f9fafb;
+  --form-input-bg: #ffffff;
+  --text-primary: #171717;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-inverted: #ffffff;
+}
+
+/* Исправление для случаев, когда тема браузера темная, но выбрана светлая тема сайта */
+@media (prefers-color-scheme: dark) {
+  :root:not(.dark):not(.light) .dark\:text-white {
+    color: #171717 !important;
+  }
+  
+  :root:not(.dark):not(.light) .dark\:bg-gray-800 {
+    background-color: #ffffff !important;
+  }
+  
+  :root:not(.dark):not(.light) .dark\:border-gray-700 {
+    border-color: #e5e7eb !important;
+  }
+}
+
+/* Исправление для случаев, когда тема браузера светлая, но выбрана темная тема сайта */
+@media (prefers-color-scheme: light) {
+  :root.dark .text-gray-900 {
+    color: var(--text-primary) !important;
+  }
+  
+  :root.dark .bg-white {
+    background-color: var(--card-bg) !important;
+  }
+  
+  :root.dark .border-gray-200 {
+    border-color: var(--card-border) !important;
+  }
+}
