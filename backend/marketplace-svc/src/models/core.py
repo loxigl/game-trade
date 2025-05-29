@@ -268,7 +268,7 @@ class Sale(Base):
     
     # Дополнительная информация
     description = Column(Text, nullable=True)
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True)
+    chat_id = Column(Integer, nullable=True)
     extra_data = Column(JSON, nullable=True)
     
     # Связи
@@ -277,7 +277,6 @@ class Sale(Base):
     buyer = relationship("User", foreign_keys=[buyer_id], backref="purchases")
     seller = relationship("User", foreign_keys=[seller_id], backref="sales")
     item = relationship("Item", backref="sales")
-    chat = relationship("Chat", backref="sale")
-
+    
     def __repr__(self):
         return f"<Sale(id={self.id}, listing_id={self.listing_id}, status={self.status})>" 

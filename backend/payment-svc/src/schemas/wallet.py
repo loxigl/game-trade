@@ -90,6 +90,14 @@ class WalletTransactionResponse(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+class WalletTransactionResponseMinimal(WalletTransactionBase):
+    """Схема ответа с данными транзакции кошелька"""
+    id: int = Field(..., description="ID транзакции")
+    wallet_id: int = Field(..., description="ID кошелька")
+    type: str = Field(..., description="Тип транзакции")
+    status: Optional[str] = Field(default=None, description="Статус транзакции")
+    created_at: datetime = Field(..., description="Дата и время создания транзакции")
+
 class WalletTransactionListResponse(BaseModel):
     """Схема ответа со списком транзакций кошелька"""
     total: int = Field(..., description="Общее количество транзакций")

@@ -11,9 +11,14 @@ from ..database.connection import get_db
 from .rabbitmq_service import get_rabbitmq_service, RabbitMQService
 from ..models.core import User, Transaction, TransactionStatus, Sale
 from .sale_service import SaleService
+from .chat_client import ChatClient, get_chat_client
+from ..config.settings import get_settings
+from fastapi import Depends
+from ..dependencies.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
+settings = get_settings()
 # Тип для обработчика сообщений
 MessageHandler = Callable[[Dict[str, Any], Session], Awaitable[None]]
 
@@ -205,6 +210,8 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
                 fee_amount = data.get("fee_amount")
             if not status_value and "status" in data:
                 status_value = data.get("status")
+            elif not status_value and "to_state" in data:
+                status_value = data.get("to_state")  # Обрабатываем случай с to_state
             if not created_at_str and "created_at" in data:
                 created_at_str = data.get("created_at")
             if not updated_at_str and "updated_at" in data:
@@ -247,22 +254,45 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
         
         # Пытаемся использовать маппинг статусов
         if status_value and isinstance(status_value, str):
-            status_upper = status_value.upper()
-            if status_upper in mapping:
-                status = mapping[status_upper]
-            else:
-                # Пытаемся напрямую преобразовать
+            # Особая обработка для случая, когда приходит статус вида "TransactionStatus.XXX"
+            if status_value.startswith("TransactionStatus."):
                 try:
-                    status = TransactionStatus(status_value)
-                except ValueError:
-                    logger.warning(f"Неизвестный статус транзакции: {status_value}")
+                    # Извлекаем часть после точки (например, COMPLETED из TransactionStatus.COMPLETED)
+                    status_part = status_value.split(".", 1)[1].strip()
+                    logger.info(f"Извлечен статус из TransactionStatus: {status_part}")
+                    
+                    # Пытаемся сопоставить с известными статусами
+                    if status_part in mapping:
+                        status = mapping[status_part]
+                    else:
+                        try:
+                            # Пытаемся напрямую создать enum
+                            status = TransactionStatus[status_part]
+                        except (KeyError, ValueError):
+                            logger.warning(f"Неизвестный статус транзакции: {status_part}")
+                            status = TransactionStatus.PENDING  # Значение по умолчанию
+                except Exception as e:
+                    logger.error(f"Ошибка при разборе статуса транзакции '{status_value}': {str(e)}")
                     status = TransactionStatus.PENDING  # Значение по умолчанию
+            else:
+                # Стандартная обработка для обычных строковых статусов
+                status_upper = status_value.upper()
+                if status_upper in mapping:
+                    status = mapping[status_upper]
+                else:
+                    # Пытаемся напрямую преобразовать
+                    try:
+                        status = TransactionStatus(status_value)
+                    except ValueError:
+                        logger.warning(f"Неизвестный статус транзакции: {status_value}")
+                        status = TransactionStatus.PENDING  # Значение по умолчанию
         
         # Также можем определить статус по типу события
         if not status and event_type:
             event_to_status = {
                 "transaction_created": TransactionStatus.PENDING,
                 "escrow_funds_held": TransactionStatus.PAID,
+                "escrow_funds_released": TransactionStatus.COMPLETED,  # Добавлен новый маппинг
                 "transaction_completed": TransactionStatus.COMPLETED,
                 "transaction_refunded": TransactionStatus.REFUNDED,
                 "transaction_disputed": TransactionStatus.DISPUTED,
@@ -272,6 +302,7 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
             for event_part, mapped_status in event_to_status.items():
                 if event_part in event_type.lower():
                     status = mapped_status
+                    logger.info(f"Статус определен по типу события '{event_type}': {status}")
                     break
         
         # Если до сих пор не определен статус
@@ -336,17 +367,22 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
                 sale = db.query(Sale).filter(Sale.transaction_id == transaction_id).first()
                 if sale:
                     sale_service = SaleService(db)
+                    logger.info(f"Обновляем статус продажи ID={sale.id}, статус до обновления {sale.status}")
                     # Обновляем статус продажи в зависимости от статуса транзакции
-                    if status == TransactionStatus.PAID:
-                        await sale_service.update_sale_status(sale.id, 0, "payment_processing", "Средства переведены в эскроу")
-                    elif status == TransactionStatus.COMPLETED:
-                        await sale_service.update_sale_status(sale.id, 0, "completed", "Транзакция завершена")
-                    elif status == TransactionStatus.REFUNDED:
-                        await sale_service.update_sale_status(sale.id, 0, "refunded", "Средства возвращены")
-                    elif status == TransactionStatus.DISPUTED:
-                        await sale_service.update_sale_status(sale.id, 0, "disputed", "Открыт спор")
-                    elif status == TransactionStatus.CANCELLED:
-                        await sale_service.update_sale_status(sale.id, 0, "canceled", "Транзакция отменена")
+                    try:
+                        if status == TransactionStatus.PAID:
+                            await sale_service.update_sale_status(sale.id, 0, "payment_processing", "Средства переведены в эскроу")
+                        elif status == TransactionStatus.COMPLETED:
+                            await sale_service.update_sale_status(sale.id, 0, "completed", "Транзакция завершена")
+                        elif status == TransactionStatus.REFUNDED:
+                            await sale_service.update_sale_status(sale.id, 0, "refunded", "Средства возвращены")
+                        elif status == TransactionStatus.DISPUTED:
+                            await sale_service.update_sale_status(sale.id, 0, "disputed", "Открыт спор")
+                        elif status == TransactionStatus.CANCELLED:
+                            await sale_service.update_sale_status(sale.id, 0, "canceled", "Транзакция отменена")
+                        logger.info(f"Обновлен статус продажи ID={sale.id} до статуса {sale.status}")
+                    except Exception as e:
+                        logger.error(f"Ошибка при обновлении статуса продажи ID={sale.id}: {str(e)}")
         else:
             # Создаем новую запись транзакции
             logger.info(f"Создаем новую транзакцию ID={transaction_id}")
@@ -433,17 +469,25 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
                         sale.transaction_id = transaction_id
                         
                         # Обновляем статус продажи в зависимости от статуса транзакции
-                        if status == TransactionStatus.PAID:
-                            sale.status = "payment_processing"
-                        elif status == TransactionStatus.COMPLETED:
-                            sale.status = "completed"
-                            sale.completed_at = datetime.utcnow()
-                        elif status == TransactionStatus.REFUNDED:
-                            sale.status = "refunded"
-                        elif status == TransactionStatus.DISPUTED:
-                            sale.status = "disputed"
-                        elif status == TransactionStatus.CANCELLED:
-                            sale.status = "canceled"
+                        try:
+                            if status == TransactionStatus.PAID:
+                                sale.status = "payment_processing"
+                                await sale_service.update_sale_status(sale.id, 0, "payment_processing", "Средства переведены в эскроу")
+                            elif status == TransactionStatus.COMPLETED:
+                                sale.status = "completed"
+                                sale.completed_at = datetime.utcnow()
+                                await sale_service.update_sale_status(sale.id, 0, "completed", "Транзакция завершена")
+                            elif status == TransactionStatus.REFUNDED:
+                                sale.status = "refunded"
+                                await sale_service.update_sale_status(sale.id, 0, "refunded", "Средства возвращены")
+                            elif status == TransactionStatus.DISPUTED:
+                                sale.status = "disputed"
+                                await sale_service.update_sale_status(sale.id, 0, "disputed", "Открыт спор")
+                            elif status == TransactionStatus.CANCELLED:
+                                sale.status = "canceled"
+                                await sale_service.update_sale_status(sale.id, 0, "canceled", "Транзакция отменена")
+                        except Exception as e:
+                            logger.error(f"Ошибка при обновлении статуса продажи ID={sale.id}: {str(e)}")
                         
                         # Добавляем дополнительную информацию о транзакции
                         if not sale.extra_data:
@@ -455,6 +499,23 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
                             "status": status.value if hasattr(status, 'value') else str(status),
                             "message": f"Транзакция {transaction_id} связана с продажей и имеет статус {status}"
                         }
+                        
+                        # Обновляем информацию о транзакции в чате, только если уже есть chat_id
+                        if sale.chat_id:
+                            try:
+                                chat_client = get_chat_client()
+                                system_token = settings.SYSTEM_TOKEN
+                                
+                                # Обновляем информацию о транзакции в существующем чате
+                                await chat_client.update_chat(
+                                    chat_id=sale.chat_id,
+                                    transaction_id=transaction_id,
+                                    listing_id=listing_id,
+                                    user_token=system_token
+                                )
+                                logger.info(f"Обновлена информация о транзакции ID={transaction_id} в чате ID={sale.chat_id}")
+                            except Exception as e:
+                                logger.error(f"Ошибка при обновлении информации о транзакции в чате: {str(e)}")
                         
                         db.commit()
                         logger.info(f"Обновлена продажа ID={sale.id} с transaction_id={transaction_id} и статусом {sale.status}")
@@ -478,6 +539,99 @@ async def handle_transaction_event(message: Dict[str, Any], db: Session) -> None
         db.rollback()
 
 
+async def handle_transaction_completed(message: Dict[str, Any], db: Session) -> None:
+    """
+    Обработчик события завершения транзакции из payment-svc
+    
+    Args:
+        message: Данные сообщения
+        db: Сессия базы данных
+    """
+    logger.info(f"Получено событие завершения транзакции от payment-svc: {message}")
+    
+    try:
+        # Получаем transaction_id из сообщения
+        transaction_id = message.get("transaction_id")
+        
+        # Если transaction_id отсутствует в корне, ищем в data
+        if not transaction_id and "data" in message and isinstance(message["data"], dict):
+            transaction_id = message["data"].get("transaction_id")
+            
+        if not transaction_id:
+            logger.error("Отсутствует transaction_id в сообщении о завершении транзакции")
+            return
+        
+        # Проверяем существование транзакции в БД
+        transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+        
+        if not transaction:
+            logger.error(f"Транзакция с ID={transaction_id} не найдена в marketplace-svc")
+            return
+        
+        # Обновляем статус транзакции на COMPLETED
+        transaction.status = TransactionStatus.COMPLETED
+        transaction.updated_at = datetime.utcnow()
+        
+        # Устанавливаем дату завершения, если её нет
+        if not transaction.completed_at:
+            transaction.completed_at = datetime.utcnow()
+        
+        # Ищем связанную продажу
+        sale = db.query(Sale).filter(Sale.transaction_id == transaction_id).first()
+        
+        if sale:
+            # Создаем экземпляр сервиса продаж
+            sale_service = SaleService(db)
+            
+            logger.info(f"Обновляем статус продажи ID={sale.id} на completed")
+            
+            try:
+                # Обновляем статус продажи на completed
+                await sale_service.update_sale_status(
+                    sale_id=sale.id,
+                    user_id=sale.buyer_id,
+                    new_status="completed"
+                )
+                
+                # Обновляем информацию о транзакции в чате, если есть chat_id
+                if sale.chat_id:
+                    try:
+                        chat_client = get_chat_client()
+                        system_token = settings.SYSTEM_TOKEN
+                        
+                        await chat_client.update_chat(
+                            chat_id=sale.chat_id,
+                            transaction_id=transaction_id,
+                            listing_id=sale.listing_id,
+                            user_token=system_token
+                        )
+                        
+                        # Отправляем системное сообщение в чат о завершении транзакции
+                        await chat_client.send_system_message(
+                            chat_id=sale.chat_id,
+                            content="✅ Транзакция успешно завершена. Средства переведены продавцу.",
+                            user_token=system_token
+                        )
+                        
+                        logger.info(f"Отправлено системное сообщение в чат ID={sale.chat_id} о завершении транзакции")
+                    except Exception as e:
+                        logger.error(f"Ошибка при обновлении информации о транзакции в чате: {str(e)}")
+                
+                logger.info(f"Статус продажи ID={sale.id} обновлен на completed")
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении статуса продажи ID={sale.id}: {str(e)}")
+        else:
+            logger.warning(f"Не найдена продажа для транзакции ID={transaction_id}")
+        
+        # Сохраняем изменения в БД
+        db.commit()
+        logger.info(f"Транзакция ID={transaction_id} успешно обновлена на статус COMPLETED")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке события завершения транзакции: {str(e)}")
+        db.rollback()
+
+
 async def setup_rabbitmq_consumers() -> None:
     """
     Настройка потребителей сообщений RabbitMQ
@@ -494,7 +648,7 @@ async def setup_rabbitmq_consumers() -> None:
         # События транзакций из payment-svc
         ("payment", "transaction.created"): handle_transaction_event,
         ("payment", "transaction.updated"): handle_transaction_event,
-        ("payment", "transaction.completed"): handle_transaction_event,
+        ("payment", "transaction.completed"): handle_transaction_completed,  # Используем новый обработчик
         ("payment", "transaction.refunded"): handle_transaction_event,
         ("payment", "transaction.disputed"): handle_transaction_event,
         ("payment", "transaction.canceled"): handle_transaction_event,
@@ -502,7 +656,7 @@ async def setup_rabbitmq_consumers() -> None:
         
         # События Escrow из payment-svc
         ("payment", "escrow.funds_held"): handle_transaction_event,
-        ("payment", "escrow.funds_released"): handle_transaction_event,
+        ("payment", "escrow.funds_released"): handle_transaction_completed,  # Используем новый обработчик
         ("payment", "escrow.funds_refunded"): handle_transaction_event,
         
         # События кошельков (если требуются)

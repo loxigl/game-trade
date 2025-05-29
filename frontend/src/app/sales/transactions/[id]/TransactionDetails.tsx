@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Descriptions, Badge, Timeline, Skeleton, Alert, Tabs, Divider, Tag, Row, Col, Statistic, Button, Space, Modal, Typography, Steps, Avatar, Table, Tooltip, Empty } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined, DollarOutlined, UserOutlined, ShoppingOutlined, 
          WarningOutlined, ExclamationCircleOutlined, LockOutlined, UnlockOutlined, HistoryOutlined,
@@ -10,6 +10,9 @@ import { format } from 'date-fns';
 import { getTransactionDetails, completeTransaction, disputeTransaction, refundTransaction, cancelTransaction } from '../../../api/transaction';
 import formatPrice from '../../../utils/formatPrice';
 import { PAYMENTS_API_URL } from '../../../api/client';
+import { formatDate, formatTransactionTime, formatRegistrationDate } from '../../../utils/date';
+import { useUsers } from '../../../hooks/useUsers';
+import ChatModal from '../../../components/ChatModal';
 
 const { TabPane } = Tabs;
 const { Text, Title } = Typography;
@@ -32,6 +35,15 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
   const [isDisputeModalVisible, setIsDisputeModalVisible] = useState<boolean>(false);
   const [isRefundModalVisible, setIsRefundModalVisible] = useState<boolean>(false);
   const [isCancelModalVisible, setIsCancelModalVisible] = useState<boolean>(false);
+  
+  // Добавляем состояние для модалки чата
+  const [isChatModalVisible, setIsChatModalVisible] = useState<boolean>(false);
+  
+  // Получаем функции для работы с пользователями
+  const { preloadUsers, getUserName, getUserAvatar } = useUsers();
+  
+  // Добавляем ref для предотвращения повторной загрузки пользователей
+  const loadedUsersRef = useRef<boolean>(false);
 
   useEffect(() => {
     const fetchTransactionDetails = async () => {
@@ -47,6 +59,30 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
         console.log("Action status:", data?.action_status);
         console.log("User role:", data?.user_role);
         console.log("API URL:", `${PAYMENTS_API_URL}/transactions/${transactionId}/details`);
+        
+        // Предзагрузка информации о пользователях
+        if (data && !loadedUsersRef.current) {
+          const userIds = [];
+          
+          // Добавляем ID покупателя и продавца, если они есть
+          if (data.buyer?.id) userIds.push(data.buyer.id);
+          if (data.seller?.id) userIds.push(data.seller.id);
+          
+          // Добавляем ID из транзакции, если они отличаются
+          if (data.transaction?.buyer_id && !userIds.includes(data.transaction.buyer_id)) {
+            userIds.push(data.transaction.buyer_id);
+          }
+          if (data.transaction?.seller_id && !userIds.includes(data.transaction.seller_id)) {
+            userIds.push(data.transaction.seller_id);
+          }
+          
+          // Если есть ID пользователей, загружаем их данные
+          if (userIds.length > 0) {
+            preloadUsers(userIds)
+              .then(() => { loadedUsersRef.current = true; })
+              .catch(err => console.error("Ошибка загрузки данных пользователей:", err));
+          }
+        }
       } catch (err) {
         console.error("Error fetching transaction details:", err);
         setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
@@ -58,7 +94,12 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
     if (transactionId) {
       fetchTransactionDetails();
     }
-  }, [transactionId]);
+    
+    // Сбрасываем флаг загрузки пользователей при размонтировании
+    return () => {
+      loadedUsersRef.current = false;
+    };
+  }, [transactionId, preloadUsers]);
 
   // Сопоставление статусов с удобочитаемыми названиями и цветами
   const getStatusBadge = (status: string) => {
@@ -298,6 +339,16 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
     }
   };
 
+  // Обработчик для открытия чата
+  const handleOpenChat = () => {
+    setIsChatModalVisible(true);
+  };
+  
+  // Обработчик для закрытия чата
+  const handleCloseChat = () => {
+    setIsChatModalVisible(false);
+  };
+
   if (loading) {
     return (
       <Card>
@@ -390,8 +441,10 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
             </Button>
           )}
           
+          
           {(!action_status?.can_complete && !action_status?.can_dispute && 
-           !action_status?.can_refund && !action_status?.can_cancel) && (
+           !action_status?.can_refund && !action_status?.can_cancel && 
+           (transaction?.status === 'canceled' || transaction?.status === 'failed')) && (
             <Alert
               message="Нет доступных действий"
               description="В текущем статусе транзакции нет доступных действий"
@@ -407,6 +460,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
 
   return (
     <div className="transaction-details">
+      
       {/* Заголовок и основная информация */}
       <Card 
         title={
@@ -433,7 +487,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
           <Col xs={24} md={8}>
             <Statistic 
               title="Дата создания" 
-              value={format(new Date(transaction.created_at), 'dd.MM.yyyy HH:mm')} 
+              value={formatTransactionTime(transaction.created_at)} 
               prefix={<ClockCircleOutlined />}
             />
           </Col>
@@ -510,16 +564,16 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
               </Descriptions.Item>
               
               <Descriptions.Item label="Дата создания" span={1}>
-                {format(new Date(transaction.created_at), 'dd.MM.yyyy HH:mm')}
+                {formatTransactionTime(transaction.created_at)}
               </Descriptions.Item>
               {transaction.completed_at && (
                 <Descriptions.Item label="Дата завершения" span={1}>
-                  {format(new Date(transaction.completed_at), 'dd.MM.yyyy HH:mm')}
+                  {formatTransactionTime(transaction.completed_at)}
                 </Descriptions.Item>
               )}
               {transaction.escrow_held_at && (
                 <Descriptions.Item label="В Escrow с" span={1}>
-                  {format(new Date(transaction.escrow_held_at), 'dd.MM.yyyy HH:mm')}
+                  {formatTransactionTime(transaction.escrow_held_at)}
                 </Descriptions.Item>
               )}
               
@@ -553,11 +607,13 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                     <Avatar 
                       size={64} 
                       icon={<UserOutlined />} 
-                      src={buyer?.avatar}
+                      src={buyer?.avatar || getUserAvatar(buyer?.id || transaction.buyer_id)}
                       style={{ backgroundColor: '#1890ff' }}
                     />
                     <div style={{ marginLeft: 16 }}>
-                      <Text strong style={{ fontSize: 16 }}>{buyer?.username || `Пользователь #${buyer?.id || transaction.buyer_id}`}</Text>
+                      <Text strong style={{ fontSize: 16 }}>
+                        {buyer?.username || getUserName(buyer?.id || transaction.buyer_id)}
+                      </Text>
                       <div>
                         <Text type="secondary">{buyer?.email}</Text>
                       </div>
@@ -566,10 +622,10 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                   </div>
                   
                   <Descriptions column={1} size="small" style={{ marginTop: 16 }}>
-                    <Descriptions.Item label="ID покупателя">{buyer?.id || transaction.buyer_id}</Descriptions.Item>
+                   
                     {buyer?.registration_date && (
-                      <Descriptions.Item label="Регистрация">
-                        {format(new Date(buyer.registration_date), 'dd.MM.yyyy')}
+                      <Descriptions.Item label="Дата регистрации">
+                        {formatRegistrationDate(buyer.registration_date)}
                       </Descriptions.Item>
                     )}
                     {buyer?.total_purchases && (
@@ -593,11 +649,13 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                     <Avatar 
                       size={64} 
                       icon={<UserOutlined />} 
-                      src={seller?.avatar}
+                      src={seller?.avatar || getUserAvatar(seller?.id || transaction.seller_id)}
                       style={{ backgroundColor: '#52c41a' }}
                     />
                     <div style={{ marginLeft: 16 }}>
-                      <Text strong style={{ fontSize: 16 }}>{seller?.username || `Пользователь #${seller?.id || transaction.seller_id}`}</Text>
+                      <Text strong style={{ fontSize: 16 }}>
+                        {seller?.username || getUserName(seller?.id || transaction.seller_id)}
+                      </Text>
                       <div>
                         <Text type="secondary">{seller?.email}</Text>
                       </div>
@@ -606,10 +664,9 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                   </div>
                   
                   <Descriptions column={1} size="small" style={{ marginTop: 16 }}>
-                    <Descriptions.Item label="ID продавца">{seller?.id || transaction.seller_id}</Descriptions.Item>
                     {seller?.registration_date && (
-                      <Descriptions.Item label="Регистрация">
-                        {format(new Date(seller.registration_date), 'dd.MM.yyyy')}
+                      <Descriptions.Item label="Дата регистрации">
+                        {formatRegistrationDate(seller.registration_date)}
                       </Descriptions.Item>
                     )}
                     {seller?.total_sales && (
@@ -645,11 +702,11 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                       {item.location && (
                         <Descriptions.Item label="Местоположение">{item.location}</Descriptions.Item>
                       )}
-                      {item.created_at && (
-                        <Descriptions.Item label="Размещено">
-                          {format(new Date(item.created_at), 'dd.MM.yyyy')}
-                        </Descriptions.Item>
-                      )}
+                      <Descriptions.Item label="Дата создания">
+                        <div className="text-xs text-gray-500">
+                          {formatDate(item.created_at)}
+                        </div>
+                      </Descriptions.Item>
                     </Descriptions>
                     
                     {item.tags && item.tags.length > 0 && (
@@ -748,7 +805,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                       key={event.id} 
                       color={color}
                       dot={icon}
-                      label={format(new Date(event.timestamp), 'dd.MM.yyyy HH:mm')}
+                      label={formatTransactionTime(event.timestamp)}
                     >
                       <div>
                         <strong>
@@ -756,8 +813,8 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transactionId }
                             ? 'Создание транзакции' 
                             : `Изменение статуса: ${event.from_status || 'Новый'} → ${event.to_status}`}
                         </strong>
+                        {event.notes && <div>{event.notes}</div>}
                       </div>
-                      {event.notes && <div>{event.notes}</div>}
                     </Timeline.Item>
                   );
                 })}

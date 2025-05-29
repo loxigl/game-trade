@@ -57,15 +57,60 @@
     description: string;
     price: number;
     currency: string;
+    is_negotiable?: boolean;
     seller_id: number;
     item_template_id: number;
     status: string;
     views_count: number;
+    expires_at?: string;
     created_at: string;
     updated_at: string;
     seller?: SellerProfile;
     item_template?: ItemTemplate;
     images: ListingImage[];
+    // Атрибуты объявления
+    item_attributes?: Array<{
+      attribute_id: number;
+      attribute_name?: string;
+      attribute_type: string;
+      value_string?: string;
+      value_number?: number;
+      value_boolean?: boolean;
+      is_required?: boolean;
+      options?: string | string[];
+    }>;
+    template_attributes?: Array<{
+      template_attribute_id: number;
+      attribute_name?: string;
+      attribute_type: string;
+      value_string?: string;
+      value_number?: number;
+      value_boolean?: boolean;
+      is_required?: boolean;
+      options?: string | string[];
+    }>;
+    all_attributes?: Array<{
+      attribute_id?: number;
+      template_attribute_id?: number;
+      attribute_name?: string;
+      name?: string;
+      attribute_type: string;
+      value_string?: string;
+      value_number?: number;
+      value_boolean?: boolean;
+      is_required?: boolean;
+      options?: string | string[];
+      attribute_source?: string;
+    }>;
+    // Дополнительные поля для детального просмотра
+    seller_rating?: number;
+    similar_listings?: Array<{
+      id: number;
+      title: string;
+      price: number;
+      currency: string;
+      images: ListingImage[];
+    }>;
     attribute_values?: Array<{
       attribute_id: number;
       attribute_type: string;
@@ -227,14 +272,14 @@
         let categories = data.data || [];
         
         // Проверяем, есть ли в категориях поле subcategories. Если нет, то преобразуем плоский список в иерархию
-        if (categories.length > 0 && categories.every(cat => !cat.subcategories)) {
+          if (categories.length > 0 && categories.every((cat: Category) => !cat.subcategories)) {
           console.log('Сервер вернул плоский список категорий, преобразуем в иерархию...');
           
           // Создаем словарь всех категорий по ID для быстрого доступа
-          const categoriesMap = categories.reduce((map, cat) => {
+          const categoriesMap = categories.reduce((map: Record<string, Category & { subcategories: Category[] }>, cat: Category) => {
             map[cat.id] = { ...cat, subcategories: [] };
             return map;
-          }, {});
+          }, {} as Record<string, Category & { subcategories: Category[] }>);
           
           // Создаем иерархическую структуру
           const rootCategories = [];
@@ -467,7 +512,7 @@
         }
 
         const responseData = await response.json();
-        return responseData;
+        return responseData.data;
       } catch (err) {
         // Подробный лог ошибки
         console.error('Ошибка при создании объявления:', err);
@@ -507,7 +552,7 @@
         let requestBody: any;
         
         // Проверяем, является ли formData экземпляром FormData
-        if (formData instanceof FormData) {
+        if (formData instanceof FormData) { 
           requestBody = formData;
           // НЕ устанавливаем Content-Type для FormData, браузер сам добавит с правильным boundary
           console.log('Отправка FormData с автоматически добавляемым браузером Content-Type');
@@ -690,4 +735,18 @@
       deleteListing,
       getUserListings,
     };
+  };
+
+  const buildCategoryMap = (categories: Category[]): Map<number, string> => {
+    const map = new Map();
+    
+    const processCategories = (cat: Category) => {
+      map.set(cat.id, cat.name);
+      if (cat.subcategories && cat.subcategories.length > 0) {
+        cat.subcategories.forEach((child: Category) => processCategories(child));
+      }
+    };
+    
+    categories.forEach((cat: Category) => processCategories(cat));
+    return map;
   };

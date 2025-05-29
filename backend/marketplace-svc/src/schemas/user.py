@@ -20,24 +20,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None, example="john.new@example.com")
     password: Optional[str] = Field(None, min_length=8, max_length=100, example="NewSecureP@ssw0rd")
 
-# Схема для ответа по пользователю
-class UserResponse(UserBase):
-    """Схема для предоставления информации о пользователе в API"""
-    id: int = Field(..., example=123)
-    created_at: datetime = Field(..., example="2025-01-01T00:00:00")
-    updated_at: Optional[datetime] = Field(None, example="2025-01-02T00:00:00")
-    
-    class Config:
-        from_attributes = True
-        schema_extra = {
-            "example": {
-                "id": 42,
-                "username": "johndoe",
-                "email": "john.doe@example.com",
-                "created_at": "2025-01-01T00:00:00",
-                "updated_at": "2025-01-02T00:00:00"
-            }
-        }
+
 
 # Схема профиля пользователя
 class ProfileBase(BaseModel):
@@ -78,3 +61,29 @@ class ProfileResponse(ProfileBase):
                 "updated_at": "2025-01-02T00:00:00"
             }
         } 
+
+# Схема для ответа по пользователю
+class UserResponse(UserBase):
+    """Схема для предоставления информации о пользователе в API"""
+    id: int = Field(..., example=123)
+    created_at: datetime = Field(..., example="2025-01-01T00:00:00")
+    updated_at: Optional[datetime] = Field(None, example="2025-01-02T00:00:00")
+    profile: Optional[ProfileResponse] = Field(None)
+    
+    class Config:
+        from_attributes = True
+        schema_extra = {
+            "example": {
+                "id": 42,
+                "username": "johndoe",
+                "email": "john.doe@example.com",
+                "created_at": "2025-01-01T00:00:00",
+                "updated_at": "2025-01-02T00:00:00",
+                "profile": {
+                    "id": 42,
+                    "user_id": 42,
+                    "avatar_url": "https://example.com/avatar.jpg",
+                    "bio": "Enthusiastic gamer with a passion for rare items."
+                }
+            }
+        }

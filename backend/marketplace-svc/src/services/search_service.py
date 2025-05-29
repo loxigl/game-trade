@@ -26,13 +26,54 @@ class SearchService:
         """
         self.db = db
     
+    def _get_category_with_subcategories(self, category_ids: List[int]) -> List[int]:
+        """
+        Получает список ID категорий включая все их подкатегории
+        
+        Args:
+            category_ids: Список ID родительских категорий
+            
+        Returns:
+            Расширенный список ID категорий включая подкатегории
+        """
+        if not category_ids:
+            return []
+        
+        all_category_ids = set(category_ids)
+        
+        # Рекурсивно находим все подкатегории для каждой категории
+        def find_subcategories(parent_ids: List[int]) -> List[int]:
+            if not parent_ids:
+                return []
+            
+            # Ищем прямые подкатегории
+            subcategories = self.db.query(ItemCategory.id).filter(
+                ItemCategory.parent_id.in_(parent_ids)
+            ).all()
+            
+            subcategory_ids = [sub.id for sub in subcategories]
+            
+            if subcategory_ids:
+                # Добавляем найденные подкатегории к общему списку
+                all_category_ids.update(subcategory_ids)
+                # Рекурсивно ищем подкатегории для найденных категорий
+                find_subcategories(subcategory_ids)
+            
+            return subcategory_ids
+        
+        # Запускаем рекурсивный поиск
+        find_subcategories(category_ids)
+        
+        return list(all_category_ids)
+    
     def search_listings(
         self, 
         pagination: PaginationParams,
         search_params: SearchParams,
         filter_params: Optional[FilterParams] = None,
         sort_by: str = "created_at",
-        sort_order: str = "desc"
+        sort_order: str = "desc",
+        include_subcategories: bool = True
     ) -> Dict[str, Any]:
         """
         Поиск объявлений по различным критериям с фильтрацией и пагинацией
@@ -43,6 +84,7 @@ class SearchService:
             filter_params: Параметры фильтрации (диапазон цен, атрибуты)
             sort_by: Поле для сортировки
             sort_order: Порядок сортировки (asc или desc)
+            include_subcategories: Включать ли подкатегории при поиске по категориям
             
         Returns:
             Dict с результатами поиска и метаданными пагинации
@@ -75,9 +117,15 @@ class SearchService:
         if search_params.game_ids and len(search_params.game_ids) > 0:
             query = query.filter(Game.id.in_(search_params.game_ids))
         
-        # Фильтрация по категориям
+        # Фильтрация по категориям с учетом подкатегорий
         if search_params.category_ids and len(search_params.category_ids) > 0:
-            query = query.filter(ItemCategory.id.in_(search_params.category_ids))
+            if include_subcategories:
+                # Получаем расширенный список категорий включая подкатегории
+                expanded_category_ids = self._get_category_with_subcategories(search_params.category_ids)
+                query = query.filter(ItemCategory.id.in_(expanded_category_ids))
+            else:
+                # Используем только указанные категории
+                query = query.filter(ItemCategory.id.in_(search_params.category_ids))
         
         # Применяем дополнительные фильтры, если указаны
         if filter_params:
@@ -167,7 +215,8 @@ class SearchService:
                 "page": pagination.page,
                 "limit": pagination.limit,
                 "pages": (total + pagination.limit - 1) // pagination.limit,
-                "query": search_params.query if search_params.query else None
+                "query": search_params.query if search_params.query else None,
+                "included_subcategories": include_subcategories
             }
         }
     
@@ -211,7 +260,13 @@ class SearchService:
         
         # Получаем список доступных категорий, фильтруя по игре, если указана
         categories_query = self.db.query(
-            ItemCategory.id, ItemCategory.name, ItemCategory.icon_url, Game.id.label("game_id"), Game.name.label("game_name")
+            ItemCategory.id, 
+            ItemCategory.name, 
+            ItemCategory.icon_url, 
+            ItemCategory.parent_id,
+            ItemCategory.category_type,
+            Game.id.label("game_id"), 
+            Game.name.label("game_name")
         ).join(
             Game, ItemCategory.game_id == Game.id
         ).filter(
@@ -228,6 +283,8 @@ class SearchService:
                 "id": c.id, 
                 "name": c.name, 
                 "icon_url": c.icon_url,
+                "parent_id": c.parent_id,
+                "category_type": c.category_type,
                 "game_id": c.game_id,
                 "game_name": c.game_name
             }
@@ -277,6 +334,78 @@ class SearchService:
         
         return result
     
+    def get_category_hierarchy(self, category_id: int) -> Dict[str, Any]:
+        """
+        Получение иерархии категории (родители и дети)
+        
+        Args:
+            category_id: ID категории
+            
+        Returns:
+            Dict с информацией о категории и её иерархии
+        """
+        # Получаем основную информацию о категории
+        category = self.db.query(ItemCategory).filter(
+            ItemCategory.id == category_id
+        ).first()
+        
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Категория не найдена"
+            )
+        
+        result = {
+            "category": {
+                "id": category.id,
+                "name": category.name,
+                "description": category.description,
+                "icon_url": category.icon_url,
+                "category_type": category.category_type,
+                "parent_id": category.parent_id
+            },
+            "breadcrumbs": [],
+            "subcategories": []
+        }
+        
+        # Строим breadcrumbs (путь к корню)
+        current_category = category
+        breadcrumbs = []
+        
+        while current_category:
+            breadcrumbs.insert(0, {
+                "id": current_category.id,
+                "name": current_category.name,
+                "icon_url": current_category.icon_url
+            })
+            
+            if current_category.parent_id:
+                current_category = self.db.query(ItemCategory).filter(
+                    ItemCategory.id == current_category.parent_id
+                ).first()
+            else:
+                current_category = None
+        
+        result["breadcrumbs"] = breadcrumbs
+        
+        # Получаем прямые подкатегории
+        subcategories = self.db.query(ItemCategory).filter(
+            ItemCategory.parent_id == category_id
+        ).order_by(ItemCategory.order_index, ItemCategory.name).all()
+        
+        result["subcategories"] = [
+            {
+                "id": sub.id,
+                "name": sub.name,
+                "description": sub.description,
+                "icon_url": sub.icon_url,
+                "category_type": sub.category_type
+            }
+            for sub in subcategories
+        ]
+        
+        return result
+    
     def get_popular_items(self, limit: int = 10) -> List[Listing]:
         """
         Получение списка популярных товаров (по количеству просмотров)
@@ -315,6 +444,8 @@ class SearchService:
             ItemCategory.id, 
             ItemCategory.name,
             ItemCategory.icon_url,
+            ItemCategory.parent_id,
+            ItemCategory.category_type,
             Game.id.label("game_id"),
             Game.name.label("game_name"),
             func.count(Listing.id).label("listings_count")
@@ -328,7 +459,8 @@ class SearchService:
             Listing.status == ListingStatus.ACTIVE,
             Game.is_active == True
         ).group_by(
-            ItemCategory.id, ItemCategory.name, ItemCategory.icon_url, Game.id, Game.name
+            ItemCategory.id, ItemCategory.name, ItemCategory.icon_url, 
+            ItemCategory.parent_id, ItemCategory.category_type, Game.id, Game.name
         ).order_by(
             desc(text("listings_count"))
         ).limit(limit)
@@ -339,6 +471,8 @@ class SearchService:
                 "id": row.id,
                 "name": row.name,
                 "icon_url": row.icon_url,
+                "parent_id": row.parent_id,
+                "category_type": row.category_type,
                 "game_id": row.game_id,
                 "game_name": row.game_name,
                 "listings_count": row.listings_count
@@ -353,7 +487,8 @@ class SearchService:
         category_id: Optional[int] = None,
         game_id: Optional[int] = None,
         sort_by: str = "name",
-        sort_order: str = "asc"
+        sort_order: str = "asc",
+        include_subcategories: bool = True
     ) -> Dict[str, Any]:
         """
         Поиск шаблонов предметов по тексту, категории или игре
@@ -365,6 +500,7 @@ class SearchService:
             game_id: ID игры для фильтрации
             sort_by: Поле для сортировки
             sort_order: Порядок сортировки (asc или desc)
+            include_subcategories: Включать ли подкатегории при поиске по категории
             
         Returns:
             Dict с результатами поиска и метаданными пагинации
@@ -386,9 +522,14 @@ class SearchService:
                 Game.name.ilike(search_text)
             ))
         
-        # Фильтрация по категории
+        # Фильтрация по категории с учетом подкатегорий
         if category_id:
-            query_builder = query_builder.filter(ItemTemplate.category_id == category_id)
+            if include_subcategories:
+                # Получаем расширенный список категорий включая подкатегории
+                expanded_category_ids = self._get_category_with_subcategories([category_id])
+                query_builder = query_builder.filter(ItemTemplate.category_id.in_(expanded_category_ids))
+            else:
+                query_builder = query_builder.filter(ItemTemplate.category_id == category_id)
         
         # Фильтрация по игре
         if game_id:
@@ -420,6 +561,7 @@ class SearchService:
                 "page": pagination.page,
                 "limit": pagination.limit,
                 "pages": (total + pagination.limit - 1) // pagination.limit,
-                "query": query if query else None
+                "query": query if query else None,
+                "included_subcategories": include_subcategories
             }
-        } 
+        }

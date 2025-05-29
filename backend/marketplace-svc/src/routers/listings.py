@@ -6,7 +6,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-
+import logging
 from ..dependencies.db import get_db
 from ..dependencies.auth import get_current_user, get_current_active_user
 from ..models.core import User
@@ -16,6 +16,7 @@ from ..schemas.marketplace import ListingCreate, ListingUpdate, ListingResponse,
 from ..schemas.categorization import ItemTemplateCreate
 from ..schemas.base import PaginationParams, SuccessResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/listings",
     tags=["listings"],
@@ -143,10 +144,9 @@ async def create_listing(
         template_service = TemplateService(db)
         template_attributes = template_service.get_template_attributes(listing_data.item_template_id)
         
-        # Добавить код для обработки атрибутов шаблона
-        # В реальном приложении здесь можно реализовать логику объединения атрибутов
     
     listing = listing_service.create_listing(listing_data, current_user)
+    logger.info(f"Объявление создано: {listing.id}")
     
     return SuccessResponse(
         data=listing,

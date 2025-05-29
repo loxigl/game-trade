@@ -276,6 +276,104 @@ async def handle_escrow_funds_held(message: Dict[str, Any], db: Session) -> None
         logger.error(f"Ошибка при обработке события перевода в Escrow: {str(e)}")
 
 
+async def handle_transaction_completed(message: Dict[str, Any], db: Session) -> None:
+    """
+    Обработчик события завершения транзакции
+    
+    Args:
+        message: Данные сообщения
+        db: Сессия базы данных
+    """
+    logger.info(f"Получено событие завершения транзакции: {message}")
+    
+    try:
+        # Получаем идентификатор транзакции
+        transaction_id = message.get("transaction_id")
+        
+        # Проверяем наличие transaction_id в сообщении
+        if not transaction_id:
+            logger.error("Отсутствует transaction_id в сообщении о завершении транзакции")
+            return
+            
+        # Получаем транзакцию из БД
+        transaction_service = get_transaction_service(db)
+        transaction = await transaction_service.get_transaction(transaction_id)
+        
+        if not transaction:
+            logger.error(f"Транзакция с ID={transaction_id} не найдена")
+            return
+            
+        # Проверяем текущий статус транзакции
+        if transaction.status == TransactionStatus.COMPLETED:
+            logger.info(f"Транзакция {transaction_id} уже имеет статус COMPLETED, пропускаем обработку")
+            return
+            
+        # Обновляем статус транзакции на COMPLETED
+        updated_transaction = await transaction_service.update_transaction_status(
+            transaction_id=transaction_id,
+            new_status=TransactionStatus.COMPLETED,
+            reason="Транзакция успешно завершена"
+        )
+        
+        # Находим связанную продажу
+        sale = None
+        if transaction.extra_data and "sale_id" in transaction.extra_data:
+            sale_id = transaction.extra_data["sale_id"]
+            sale = db.query(Sale).filter(Sale.id == sale_id).first()
+        else:
+            # Ищем продажу по transaction_id
+            sale = db.query(Sale).filter(Sale.transaction_id == transaction_id).first()
+            
+        # Обновляем статус продажи, если она найдена
+        if sale:
+            sale.status = SaleStatus.COMPLETED.value
+            sale.completed_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"Обновлен статус продажи ID={sale.id} на COMPLETED")
+            
+        # Отправляем уведомление о завершении транзакции в marketplace-svc
+        rabbitmq = get_rabbitmq_service()
+        
+        completion_message = {
+            "event_type": "transaction_completed",
+            "transaction_id": transaction_id,
+            "status": TransactionStatus.COMPLETED.value,
+            "completed_at": updated_transaction.completed_at.isoformat() if updated_transaction.completed_at else datetime.utcnow().isoformat(),
+            "sale_id": sale.id if sale else None,
+            "listing_id": transaction.listing_id,
+            "buyer_id": transaction.buyer_id,
+            "seller_id": transaction.seller_id,
+            "amount": transaction.amount,
+            "currency": transaction.currency
+        }
+        
+        # Публикуем сообщение
+        await rabbitmq.publish("marketplace", "transaction.completed", completion_message)
+        
+        # Также отправляем сообщение о освобождении средств из эскроу
+        escrow_message = {
+            "event_type": "escrow.funds_released",
+            "transaction_id": transaction_id,
+            "status": "funds_released",
+            "to_state": TransactionStatus.COMPLETED.value,
+            "completed_at": updated_transaction.completed_at.isoformat() if updated_transaction.completed_at else datetime.utcnow().isoformat(),
+            "sale_id": sale.id if sale else None,
+            "listing_id": transaction.listing_id,
+            "buyer_id": transaction.buyer_id,
+            "seller_id": transaction.seller_id,
+            "amount": transaction.amount,
+            "currency": transaction.currency
+        }
+        
+        await rabbitmq.publish("payment", "escrow.funds_released", escrow_message)
+        
+        logger.info(f"Уведомления о завершении транзакции ID={transaction_id} отправлены в marketplace-svc")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке события завершения транзакции: {str(e)}")
+        db.rollback()
+
+
 async def setup_rabbitmq_consumers() -> None:
     """
     Настройка потребителей сообщений RabbitMQ
@@ -292,6 +390,7 @@ async def setup_rabbitmq_consumers() -> None:
         ("marketplace", "sales.created"): handle_sale_created,
         ("marketplace", "sales.completed"): handle_sale_completed,
         ("payment", "escrow.funds_held"): handle_escrow_funds_held,
+        ("marketplace", "transaction.complete_request"): handle_transaction_completed,  # Добавляем новый обработчик
     }
     
     # Обертка для передачи сессии БД в обработчики

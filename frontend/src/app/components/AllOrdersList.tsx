@@ -202,7 +202,7 @@ const AllOrdersList: React.FC<AllOrdersListProps> = ({ onOpenChat }) => {
             </Button>
           </Link>
           
-          {isChatAvailable(record) && (
+          {/* {isChatAvailable(record) && (
             <Tooltip title="Открыть чат с продавцом/покупателем">
               <Button 
                 size="small" 
@@ -213,7 +213,7 @@ const AllOrdersList: React.FC<AllOrdersListProps> = ({ onOpenChat }) => {
                 Чат
               </Button>
             </Tooltip>
-          )}
+          )} */}
         </Space>
       ),
     },

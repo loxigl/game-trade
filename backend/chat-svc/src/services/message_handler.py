@@ -152,7 +152,7 @@ async def handle_completion_chat_request(message: Dict[str, Any]) -> None:
             "chat_id": chat_id,
             "content": "Покупатель инициировал подтверждение завершения доставки. Пожалуйста, обсудите детали завершения заказа.",
             "timestamp": message.get("timestamp"),
-            "metadata": {
+            "message_metadata": {
                 "sale_id": sale_id,
                 "transaction_id": transaction_id
             }

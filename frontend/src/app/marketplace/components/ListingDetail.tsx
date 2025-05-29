@@ -13,6 +13,7 @@ import ListingCard from './ListingCard';
 import { Card, Button, Typography, Modal, Input, Avatar, List, Divider, message, Spin, Tabs, Tooltip } from 'antd';
 import { SendOutlined, UserOutlined, ShoppingCartOutlined, CloseCircleOutlined, CheckCircleOutlined, InfoCircleOutlined, QuestionCircleOutlined, MessageOutlined } from '@ant-design/icons';
 import BuyButton from '../../components/BuyButton';
+import ChatModal from '../../components/ChatModal';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -26,22 +27,42 @@ interface ListingDetailProps {
 interface Category {
   id: number;
   name: string;
+  description?: string;
   icon_url?: string;
   game_id: number;
   parent_id?: number | null;
   parent?: Category;
-  description?: string;
-  game_name?: string;
+  category_type?: string;
+  order_index?: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface ItemTemplate {
   id: number;
   name: string;
   description?: string;
+  icon_url?: string;
+  is_tradable: boolean;
+  base_price: number;
   category_id: number;
   category?: Category;
   attributes?: any[];
-  template_attributes?: any[];
+  template_attributes?: Array<{
+    id: number;
+    name: string;
+    description?: string;
+    attribute_type: string;
+    is_required: boolean;
+    is_filterable: boolean;
+    default_value?: string;
+    options?: any;
+    template_id: number;
+    created_at: string;
+    updated_at: string;
+  }>;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Listing {
@@ -51,32 +72,27 @@ interface Listing {
   price: number;
   currency: string;
   status: string;
+  is_negotiable: boolean;
+  seller_id: number;
+  item_id: number;
+  item_template_id: number;
+  views_count: number;
+  expires_at?: string | null;
   created_at: string;
   updated_at: string;
-  views_count: number;
   seller: {
     id: number;
     username: string;
-    avatar_url?: string;
-    rating?: number;
+    email: string;
+    created_at: string;
+    updated_at?: string | null;
   };
   item_template?: ItemTemplate;
-  category?: Category;
   images: Array<{
     id: number;
     url: string;
     is_main: boolean;
     order_index: number;
-  }>;
-  all_attributes?: Array<{
-    attribute_id: number;
-    attribute_name: string;
-    attribute_type: string;
-    attribute_source: string;
-    value_string?: string;
-    value_number?: number;
-    value_boolean?: boolean;
-    is_template_attr?: boolean;
   }>;
   item_attributes?: Array<{
     id: number;
@@ -96,8 +112,37 @@ interface Listing {
     value_number?: number;
     value_boolean?: boolean;
   }>;
-  similar_listings?: Listing[];
-  seller_rating?: number;
+  all_attributes?: Array<{
+    attribute_id: number;
+    attribute_name: string;
+    attribute_type: string;
+    attribute_source: string;
+    value_string?: string;
+    value_number?: number;
+    value_boolean?: boolean;
+    is_template_attr?: boolean;
+  }>;
+  similar_listings?: Array<{
+    id: number;
+    title: string;
+    description?: string;
+    price: number;
+    currency: string;
+    status: string;
+    seller_id: number;
+    item_template_id: number;
+    item_id: number;
+    views_count: number;
+    created_at: string;
+    updated_at: string;
+    images?: Array<{
+      id: number;
+      url: string;
+      is_main: boolean;
+      order_index: number;
+    }>;
+  }>;
+  seller_rating?: number | null;
 }
 
 // Интерфейс для сообщения чата
@@ -456,9 +501,6 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
     }
     
     if (listing && listing.seller) {
-      // Загружаем историю сообщений и информацию о транзакции
-      loadChatHistory(listing.seller.id);
-      loadTransactionInfo();
       setIsChatModalOpen(true);
     }
   };
@@ -589,18 +631,18 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
       </li>
     );
     
-    // Добавляем игру, если она указана
-    const gameName = listing.item_template?.category?.game_name || '';
-    if (gameName) {
-      breadcrumbs.push(
-        <li key="game">
-          <div className="flex items-center">
-            <span className="mx-2 text-gray-400">/</span>
-            <span className="text-gray-500">{gameName}</span>
-          </div>
-        </li>
-      );
-    }
+    // Добавляем игру, если она указана (убираем game_name, так как его нет в новой структуре)
+    // const gameName = listing.item_template?.category?.game_name || '';
+    // if (gameName) {
+    //   breadcrumbs.push(
+    //     <li key="game">
+    //       <div className="flex items-center">
+    //         <span className="mx-2 text-gray-400">/</span>
+    //         <span className="text-gray-500">{gameName}</span>
+    //       </div>
+    //     </li>
+    //   );
+    // }
     
     // Функция для построения пути категорий
     const buildCategoryPath = (category?: Category): Category[] => {
@@ -618,8 +660,8 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
       return path;
     };
     
-    // Получаем путь категорий
-    const categoryPath = buildCategoryPath(listing.item_template?.category || listing.category);
+    // Получаем путь категорий (убираем ссылку на listing.category)
+    const categoryPath = buildCategoryPath(listing.item_template?.category);
     
     // Добавляем категории в хлебные крошки
     categoryPath.forEach((category, index) => {
@@ -763,6 +805,266 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
     );
   };
   
+  // Рендер дополнительной информации для продавца
+  const renderSellerInfo = () => {
+    if (!isOwner || !listing) return null;
+    
+    return (
+      <Card className="mb-6" title="Информация для продавца">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{listing.views_count}</div>
+            <div className="text-sm text-gray-500">Просмотров</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">
+              {listing.status === 'active' ? 'Активно' : 
+               listing.status === 'pending' ? 'На модерации' :
+               listing.status === 'sold' ? 'Продано' : 
+               listing.status === 'expired' ? 'Истекло' : 'Неизвестно'}
+            </div>
+            <div className="text-sm text-gray-500">Статус</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">
+              {formatDistanceToNow(new Date(listing.created_at), { addSuffix: false, locale: ru })}
+            </div>
+            <div className="text-sm text-gray-500">На сайте</div>
+          </div>
+        </div>
+        
+        {listing.expires_at && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <Text type="warning">
+              <InfoCircleOutlined className="mr-1" />
+              Объявление истекает: {new Date(listing.expires_at).toLocaleDateString('ru-RU')}
+            </Text>
+          </div>
+        )}
+        
+        {listing.status === 'pending' && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <Text type="secondary">
+              <InfoCircleOutlined className="mr-1" />
+              Ваше объявление находится на модерации. Оно станет видимым после проверки.
+            </Text>
+          </div>
+        )}
+      </Card>
+    );
+  };
+  
+  // Рендер информации о товаре (item template)
+  const renderItemTemplateInfo = () => {
+    if (!listing?.item_template) return null;
+    
+    const template = listing.item_template;
+    
+    return (
+      <Card className="mb-6" title="О товаре">
+        <div className="space-y-4">
+          <div>
+            <Text strong>Название: </Text>
+            <Text>{template.name}</Text>
+          </div>
+          
+          {template.description && (
+            <div>
+              <Text strong>Описание: </Text>
+              <Paragraph>{template.description}</Paragraph>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Text strong>Торгуемый: </Text>
+              <Text type={template.is_tradable ? 'success' : 'danger'}>
+                {template.is_tradable ? 'Да' : 'Нет'}
+              </Text>
+            </div>
+            
+            {template.base_price > 0 && (
+              <div>
+                <Text strong>Базовая цена: </Text>
+                <Text>{formatPrice(template.base_price, listing.currency)}</Text>
+              </div>
+            )}
+          </div>
+          
+          {template.category && (
+            <div>
+              <Text strong>Категория: </Text>
+              <Text>{template.category.name}</Text>
+              {template.category.description && (
+                <div className="text-sm text-gray-500 mt-1">
+                  {template.category.description}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  };
+  
+  // Рендер информации о продавце с расширенными данными
+  const renderSellerCard = () => {
+    if (!listing?.seller) return null;
+    
+    const seller = listing.seller;
+    const memberSince = formatDistanceToNow(new Date(seller.created_at), { addSuffix: true, locale: ru });
+    
+    return (
+      <Card className="mb-6" title="Продавец">
+        <div className="flex items-start space-x-4">
+          <Avatar size={64} icon={<UserOutlined />} />
+          
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-2">
+              <Text strong className="text-lg">{seller.username}</Text>
+              {listing.seller_rating && (
+                <div className="flex items-center">
+                  <span className="text-yellow-500">★</span>
+                  <span className="ml-1">{listing.seller_rating.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="text-sm text-gray-500 mb-3">
+              На сайте {memberSince}
+            </div>
+            
+            {!isOwner && isAuthenticated && (
+              <Button 
+                type="primary" 
+                icon={<MessageOutlined />}
+                onClick={handleContactSeller}
+                className="w-full"
+              >
+                Связаться с продавцом
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  };
+  
+  // Рендер ценовой информации с дополнительными данными
+  const renderPriceInfo = () => {
+    if (!listing) return null;
+    
+    return (
+      <Card className="mb-6">
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-gray-900 mb-2">
+              {formatPrice(listing.price, listing.currency)}
+            </div>
+            
+            {listing.is_negotiable && (
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                Цена договорная
+              </div>
+            )}
+          </div>
+       
+          
+          <div className="text-sm text-gray-500 text-center">
+            Размещено {formatDistanceToNow(new Date(listing.created_at), { addSuffix: true, locale: ru })}
+          </div>
+          
+          <div className="text-sm text-gray-500 text-center">
+            Обновлено {formatDistanceToNow(new Date(listing.updated_at), { addSuffix: true, locale: ru })}
+          </div>
+        </div>
+      </Card>
+    );
+  };
+  
+  // Рендер рекомендаций для покупателей
+  const renderBuyerTips = () => {
+    if (isOwner || !listing) return null;
+    
+    return (
+      <Card className="mt-6" title="💡 Советы покупателю">
+        <div className="space-y-3 text-sm">
+          <div className="flex items-start space-x-2">
+            <CheckCircleOutlined className="text-green-500 mt-0.5" />
+            <span>Обязательно свяжитесь с продавцом перед покупкой, чтобы уточнить детали</span>
+          </div>
+          
+          <div className="flex items-start space-x-2">
+            <CheckCircleOutlined className="text-green-500 mt-0.5" />
+            <span>Проверьте рейтинг продавца и отзывы других покупателей</span>
+          </div>
+          
+          {listing.is_negotiable && (
+            <div className="flex items-start space-x-2">
+              <CheckCircleOutlined className="text-green-500 mt-0.5" />
+              <span>Цена договорная - можете предложить свою цену продавцу</span>
+            </div>
+          )}
+          
+          {listing.item_template?.is_tradable && (
+            <div className="flex items-start space-x-2">
+              <CheckCircleOutlined className="text-green-500 mt-0.5" />
+              <span>Товар торгуемый - можете обменять на другие предметы</span>
+            </div>
+          )}
+          
+          <div className="flex items-start space-x-2">
+            <InfoCircleOutlined className="text-blue-500 mt-0.5" />
+            <span>Все платежи проходят через безопасную систему эскроу</span>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+  
+  // Рендер статистики объявления для всех пользователей
+  const renderListingStats = () => {
+    if (!listing) return null;
+    
+    return (
+      <Card className="mt-6" title="📊 Статистика объявления">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-blue-600">{listing.views_count}</div>
+            <div className="text-gray-500">Просмотров</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-lg font-semibold text-green-600">
+              {formatDistanceToNow(new Date(listing.created_at), { locale: ru })}
+            </div>
+            <div className="text-gray-500">Назад создано</div>
+          </div>
+          
+          {listing.updated_at !== listing.created_at && (
+            <>
+              <div className="text-center">
+                <div className="text-lg font-semibold text-orange-600">
+                  {formatDistanceToNow(new Date(listing.updated_at), { locale: ru })}
+                </div>
+                <div className="text-gray-500">Назад обновлено</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-semibold text-purple-600">
+                  {Math.round((new Date().getTime() - new Date(listing.updated_at).getTime()) / (1000 * 60 * 60 * 24))}
+                </div>
+                <div className="text-gray-500">Дней с обновления</div>
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+    );
+  };
+  
   // Отображение загрузки
   if (isLoading) {
     return (
@@ -793,7 +1095,6 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
   
   // Получаем главное изображение или первое из списка
   const mainImage = listing.images?.find((img) => img.is_main) || listing.images?.[0];
-  const createdAtDate = new Date(listing.created_at);
   
   // Проверяем, является ли текущий пользователь продавцом
   const isOwner = isAuthenticated && user?.id === listing.seller?.id;
@@ -802,6 +1103,9 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
     <div className="container mx-auto px-4 py-8">
       {/* Хлебные крошки */}
       {renderBreadcrumbs()}
+      
+      {/* Информация для продавца (только если это его объявление) */}
+      {renderSellerInfo()}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Галерея изображений */}
@@ -852,9 +1156,12 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
             </div>
           )}
           
+          {/* Информация о товаре (item template) */}
+          {renderItemTemplateInfo()}
+          
           {/* Описание и атрибуты */}
           <div className="mt-8 bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Описание</h2>
+            <h2 className="text-xl font-semibold mb-4">Описание объявления</h2>
             <p className="whitespace-pre-line text-gray-700">{listing.description || 'Описание отсутствует'}</p>
             
             {/* Атрибуты предмета - используем новую функцию renderAttributes */}
@@ -862,18 +1169,17 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
           </div>
         </div>
         
-        {/* Информация о цене и продавце */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {formatPrice(listing.price, listing.currency)}
-              </h2>
-              <div className="text-sm text-gray-500">
-                Размещено {formatDistanceToNow(createdAtDate, { addSuffix: true, locale: ru })}
-            </div>
-            </div>
-            
+        {/* Боковая панель с информацией */}
+        <div className="lg:col-span-1 space-y-6">
+          
+          {/* Ценовая информация */}
+          {renderPriceInfo()}
+          
+          {/* Информация о продавце */}
+          {renderSellerCard()}
+          
+          {/* Кнопки действий */}
+          <div className="space-y-4">
             {!isOwner && listing.status === 'active' && (
               <BuyButton
                 listingId={listing.id}
@@ -884,22 +1190,32 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
             )}
             
             {isOwner && (
-              <div className="space-y-4">
-                <button
+              <div className="space-y-3">
+                <Button
+                  type="primary"
                   onClick={() => router.push(`/marketplace/listings/${listing.id}/edit`)}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="w-full"
+                  size="large"
                 >
                   Редактировать
-                </button>
-                <button
+                </Button>
+                <Button
+                  danger
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  className="w-full"
+                  size="large"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
             )}
-                  </div>
+          </div>
+          
+          {/* Рекомендации для покупателей */}
+          {renderBuyerTips()}
+          
+          {/* Статистика объявления */}
+          {renderListingStats()}
         </div>
       </div>
       
@@ -934,171 +1250,82 @@ export default function ListingDetail({ listingId }: ListingDetailProps) {
           <h2 className="text-2xl font-bold mb-6">Похожие объявления</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {listing.similar_listings.map(item => (
-              <div 
-                key={item.id} 
-                className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition"
+              <Card
+                key={item.id}
+                hoverable
+                className="overflow-hidden"
                 onClick={() => router.push(`/marketplace/listings/${item.id}`)}
-              >
-                <div className="h-48 bg-gray-100 relative">
-                  {item.images && item.images.length > 0 ? (
-                    <Image
-                      src={item.images[0].url}
-                      alt={item.title}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-gray-400">Нет изображения</span>
+                cover={
+                  <div className="h-48 bg-gray-100 relative">
+                    {item.images && item.images.length > 0 ? (
+                      <Image
+                        src={item.images[0].url}
+                        alt={item.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-gray-400">Нет изображения</span>
+                      </div>
+                    )}
+                    
+                    {/* Статус объявления */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        item.status === 'active' ? 'bg-green-100 text-green-800' :
+                        item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        item.status === 'sold' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {item.status === 'active' ? 'Активно' : 
+                         item.status === 'pending' ? 'Модерация' :
+                         item.status === 'sold' ? 'Продано' : 
+                         item.status}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold mb-2 line-clamp-2">{item.title}</h3>
-                  <p className="text-xl font-bold text-blue-600">
-                    {new Intl.NumberFormat('ru-RU', {
-                      style: 'currency',
-                      currency: item.currency,
-                      maximumFractionDigits: 2
-                    }).format(item.price)}
-                  </p>
-                  <div className="mt-2 text-sm text-gray-500">
-                    Размещено: {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: ru })}
                   </div>
-                </div>
-              </div>
+                }
+              >
+                <Card.Meta
+                  title={
+                    <div className="line-clamp-2 text-sm font-medium">
+                      {item.title}
+                    </div>
+                  }
+                  description={
+                    <div className="space-y-2">
+                      <div className="text-lg font-bold text-blue-600">
+                        {formatPrice(item.price, item.currency)}
+                      </div>
+                      
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>{item.views_count} просм.</span>
+                        <span>{formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: ru })}</span>
+                      </div>
+                      
+                      {item.description && (
+                        <div className="text-xs text-gray-600 line-clamp-2">
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </Card>
             ))}
           </div>
         </div>
       )}
       
-      {/* Добавляем модальное окно чата */}
-      <Modal
+      {/* Заменяем старое модальное окно чата на новый ChatModal */}
+      <ChatModal
+        visible={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        listingId={listing?.id}
+        sellerId={listing?.seller?.id}
         title={`Чат с продавцом: ${listing?.seller?.username || 'Продавец'}`}
-        open={isChatModalOpen}
-        onCancel={() => setIsChatModalOpen(false)}
-        footer={null}
-        width={800}
-      >
-        <div className="flex flex-col md:flex-row h-[500px] gap-4">
-          {/* Левая панель с информацией о товаре и статусе сделки */}
-          <div className="w-full md:w-1/3 p-4 border rounded-md overflow-y-auto">
-            <div className="mb-4">
-              <Title level={5}>Информация о товаре</Title>
-              <div className="mb-2 relative h-48">
-                <Image 
-                  src={listing?.images?.[0]?.url || '/placeholder-image.jpg'} 
-                  alt={listing?.title || 'Товар'} 
-                  fill
-                  className="object-cover rounded-md"
-                />
-              </div>
-              <Text strong>{listing?.title}</Text>
-              <div>
-                <Text type="secondary">{listing?.price} {listing?.currency}</Text>
-              </div>
-            </div>
-            
-            <Divider />
-            
-            <div className="mb-4">
-              <Title level={5}>Статус сделки</Title>
-              {renderTransactionStatus()}
-              {renderTransactionActions()}
-            </div>
-          </div>
-          
-          {/* Правая панель с чатом */}
-          <div className="w-full md:w-2/3 flex flex-col border rounded-md">
-            {/* Сообщения чата */}
-            <div className="flex-grow p-4 overflow-y-auto">
-              {loadingMessages ? (
-                <div className="flex justify-center items-center h-full">
-                  <Spin tip="Загрузка сообщений..." />
-                </div>
-              ) : chatMessages.length === 0 ? (
-                <div className="flex justify-center items-center h-full text-gray-400">
-                  <div className="text-center">
-                    <div className="mb-2">
-                      <MessageOutlined style={{ fontSize: '2rem' }} />
-                    </div>
-                    <Text type="secondary">Нет сообщений</Text>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {chatMessages.map((msg) => (
-                    <div 
-                      key={msg.id} 
-                      className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`max-w-[70%] p-3 rounded-lg ${
-                          msg.senderId === user?.id 
-                            ? 'bg-blue-500 text-white rounded-br-none' 
-                            : 'bg-gray-100 rounded-bl-none'
-                        }`}
-                      >
-                        <div className="flex items-center mb-1">
-                          <Text 
-                            strong 
-                            style={{ 
-                              color: msg.senderId === user?.id ? 'white' : 'inherit',
-                              marginRight: '8px'
-                            }}
-                          >
-                            {msg.senderId === user?.id ? 'Вы' : msg.senderName}
-                          </Text>
-                          <Text 
-                            type="secondary" 
-                            style={{ 
-                              fontSize: '0.75rem',
-                              color: msg.senderId === user?.id ? 'rgba(255,255,255,0.7)' : undefined 
-                            }}
-                          >
-                            {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </Text>
-                        </div>
-                        <div>{msg.message}</div>
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-            
-            {/* Ввод сообщения */}
-            <div className="p-3 border-t">
-              <div className="flex">
-                <TextArea 
-                  placeholder="Введите сообщение..."
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onPressEnter={(e) => {
-                    if (!e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  autoSize={{ minRows: 1, maxRows: 4 }}
-                  disabled={isSendingMessage}
-                  className="flex-grow mr-2"
-                />
-                <Button 
-                  type="primary" 
-                  icon={<SendOutlined />}
-                  onClick={sendMessage}
-                  loading={isSendingMessage}
-                />
-              </div>
-              <Text type="secondary" className="text-xs mt-1">
-                Нажмите Shift+Enter для переноса строки
-              </Text>
-            </div>
-          </div>
-        </div>
-      </Modal>
+      />
     </div>
   );
 } 
