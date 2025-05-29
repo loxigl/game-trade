@@ -10,28 +10,33 @@ from datetime import datetime, timedelta, date
 import calendar
 from dateutil.relativedelta import relativedelta
 import httpx
-
+import logging
+from decimal import Decimal
 from ..config import get_settings
 from ..models.transaction import Transaction, TransactionStatus, TransactionType
 from ..models.core import Sale, SaleStatus
 from ..models.statistics import SellerStatistics, BuyerStatistics, ProductStatistics
+from ..services.currency_service import get_currency_service
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
 class StatisticsService:
+
     """
     Сервис для получения и анализа статистики по продажам и транзакциям
     """
     def __init__(self, db: Session):
         self.db = db
-        
+    
     async def get_seller_statistics(
         self,
         seller_id: int,
         period: str = "month",
         start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
+        end_date: Optional[datetime] = None,
+        base_currency: str = "USD"  # Базовая валюта для статистики
     ) -> Dict[str, Any]:
         """
         Получение статистики продаж для продавца
@@ -41,6 +46,7 @@ class StatisticsService:
             period: Период статистики (week, month, quarter, year, all)
             start_date: Начальная дата (опционально)
             end_date: Конечная дата (опционально)
+            base_currency: Базовая валюта для расчета статистики
             
         Returns:
             Статистика продаж для указанного продавца
@@ -61,6 +67,9 @@ class StatisticsService:
             else:  # all
                 start_date = end_date - timedelta(days=365 * 2)  # за 2 года
         
+        # Инициализируем сервис конвертации валют
+        currency_service = get_currency_service(self.db)
+        
         # Фильтр по продавцу и временному диапазону
         date_filter = and_(
             Transaction.created_at >= start_date,
@@ -69,26 +78,47 @@ class StatisticsService:
             Transaction.type == TransactionType.PURCHASE  # Только продажи
         )
 
-        # Получаем месячные продажи
-        monthly_query = (
-            self.db.query(
-                func.date_trunc('month', Transaction.created_at).label('month'),
-                func.count().label('sales'),
-                func.sum(Transaction.amount).label('revenue')
-            )
-            .filter(date_filter)
-            .group_by(func.date_trunc('month', Transaction.created_at))
-            .order_by(func.date_trunc('month', Transaction.created_at))
-        )
+        # Получаем транзакции для конвертации валют
+        transactions = self.db.query(Transaction).filter(date_filter).all()
         
-        monthly_results = monthly_query.all()
+        # Группируем транзакции по месяцам
+        monthly_data = {}
+        total_sales = 0
+        total_revenue_usd = 0.0
+        game_sales = {}
+        
+        for transaction in transactions:
+            # Конвертируем сумму в базовую валюту
+            converted_amount = await currency_service.convert_currency(
+                Decimal(str(transaction.amount)), 
+                transaction.currency, 
+                base_currency
+            )
+            converted_amount_float = float(converted_amount)
+            
+            # Группируем по месяцам
+            month_key = transaction.created_at.strftime('%B %Y')
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {'sales': 0, 'revenue': 0.0}
+            
+            monthly_data[month_key]['sales'] += 1
+            monthly_data[month_key]['revenue'] += converted_amount_float
+            
+            # Общая статистика
+            total_sales += 1
+            total_revenue_usd += converted_amount_float
+            
+            # Список ID листингов для запроса информации об играх
+            listing_id = transaction.listing_id
+        
+        # Преобразуем месячные данные в список для API
         monthly_sales = [
             {
-                "month": month.strftime('%B %Y'),
-                "sales": int(sales),
-                "revenue": float(revenue) if revenue is not None else 0.0
+                "month": month,
+                "sales": data['sales'],
+                "revenue": data['revenue']
             }
-            for month, sales, revenue in monthly_results
+            for month, data in monthly_data.items()
         ]
         
         # Если нет данных, добавим пустой месяц
@@ -99,7 +129,7 @@ class StatisticsService:
                 "revenue": 0.0
             }]
         
-        transactions = self.db.query(Transaction).filter(date_filter).all()
+        # Собираем идентификаторы листингов для запроса данных об играх
         listing_ids = [transaction.listing_id for transaction in transactions]
         
         # Используем эндпоинт /statistics/listings/by-ids для получения информации о нескольких листингах сразу
@@ -108,6 +138,7 @@ class StatisticsService:
             api_url = f"{settings.MARKETPLACE_SERVICE_URL}/statistics/listings/by-ids"
             async with httpx.AsyncClient() as client:
                 response = await client.get(api_url, params={"listing_ids": listing_ids})
+                logger.info(f"Получен ответ от marketplace-svc: {response.status_code}")
                 if response.status_code == 200:
                     result_data = response.json()
                     if "data" in result_data:
@@ -184,26 +215,13 @@ class StatisticsService:
             # Определяем самую популярную игру
             popular_game = game_results[0][0] if game_results else "Нет данных"
         
-        # Общая статистика
-        total_query = (
-            self.db.query(
-                func.count().label('total_sales'),
-                func.sum(Transaction.amount).label('total_revenue')
-            )
-            .filter(date_filter)
-        )
-        
-        total_result = total_query.first()
-        total_sales = int(total_result.total_sales) if total_result.total_sales else 0
-        total_revenue = float(total_result.total_revenue) if total_result.total_revenue else 0.0
-        
         # Средняя цена
-        average_price = round(total_revenue / total_sales if total_sales > 0 else 0, 2)
+        average_price = round(total_revenue_usd / total_sales if total_sales > 0 else 0, 2)
         
         # Процент завершенных транзакций
         completion_query = (
             self.db.query(
-                func.count(case((Transaction.status == TransactionStatus.COMPLETED, 1), else_=0)).label('completed'),
+                func.count(case((Transaction.status == TransactionStatus.COMPLETED, 1))).label('completed'),
                 func.count().label('total')
             )
             .filter(
@@ -215,7 +233,7 @@ class StatisticsService:
         )
         
         completion_result = completion_query.first()
-        logger
+        logger.info(f"completion_result: {completion_result}")
         completed = int(completion_result.completed) if completion_result.completed else 0
         total_tx = int(completion_result.total) if completion_result.total else 0
         completion_rate = round((completed / total_tx) * 100, 1) if total_tx > 0 else 0
@@ -223,7 +241,7 @@ class StatisticsService:
         # Процент возвратов
         return_query = (
             self.db.query(
-                func.count(case((Transaction.status == TransactionStatus.REFUNDED, 1), else_=0)).label('refunded'),
+                func.count(case((Transaction.status == TransactionStatus.REFUNDED, 1))).label('refunded'),
                 func.count().label('total')
             )
             .filter(
@@ -252,7 +270,8 @@ class StatisticsService:
         
         return {
             "totalSales": total_sales,
-            "totalRevenue": total_revenue,
+            "totalRevenue": total_revenue_usd,
+            "baseCurrency": base_currency,  # Добавляем информацию о базовой валюте
             "averagePrice": average_price,
             "popularGame": popular_game,
             "completionRate": completion_rate,

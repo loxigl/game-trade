@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # Auth service
     AUTH_SERVICE_URL: AnyHttpUrl
     
+    # Chat service
+    CHAT_SERVICE_URL: str = "http://chat-svc:8003"
+    
+    # System tokens
+    SYSTEM_TOKEN: str = "system_secret_token"
+    
     # JWT (используется для валидации токенов)
     JWT_SECRET: str
     

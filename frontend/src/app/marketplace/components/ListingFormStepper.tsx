@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '../../hooks/auth';
 import { useMarketplace } from '../../hooks/marketplace';
 import { useImageUpload, ImageType } from '../../hooks/image-upload';
+import { message } from 'antd';
 
 interface ListingFormStepperProps {
   listingId?: number;
@@ -664,9 +665,22 @@ export default function ListingFormStepper({
 
       // Переходим на страницу объявления
       if (result?.id) {
+        console.log(`Объявление ${isEdit ? 'обновлено' : 'создано'} успешно. ID: ${result.id}. Перенаправление на страницу объявления...`);
+        
+        // Принудительно завершаем все текущие операции и очищаем состояние формы
+        setIsLoading(false);
+        
+        // Показываем уведомление об успехе
+        message.success(`Объявление успешно ${isEdit ? 'обновлено' : 'создано'}!`, 2);
+        
+        // Добавляем короткую задержку перед переходом, чтобы пользователь увидел сообщение
         setTimeout(() => {
+          // Используем router.push для программного перехода на страницу объявления
           router.push(`/marketplace/listings/${result.id}`);
-        }, 1500);
+        }, 300);
+        
+        // Выходим из функции, чтобы избежать дальнейшего выполнения
+        return;
       }
     } catch (err) {
       console.error('Ошибка при создании/обновлении объявления:', err);
@@ -1174,8 +1188,32 @@ export default function ListingFormStepper({
                     <h4 className="text-sm font-medium text-gray-700">Атрибуты:</h4>
                     <div className="mt-1 grid grid-cols-2 gap-2">
                       {allAttributes.map(attr => {
-                        const value = attributeValues[attr.attribute_id || attr.template_attribute_id];
-                        if (value === undefined || value === '') return null;
+                        // Определяем правильный ID атрибута
+                        let attrId: number;
+                        let attrName: string;
+                        
+                        // Для атрибутов категории
+                        if (attr.attribute_id) {
+                          attrId = attr.attribute_id;
+                          attrName = attr.attribute_name || attr.name || 'Неизвестный атрибут';
+                        }
+                        // Для атрибутов шаблона  
+                        else if (attr.template_attribute_id) {
+                          attrId = attr.template_attribute_id;
+                          attrName = attr.attribute_name || attr.name || 'Неизвестный атрибут';
+                        }
+                        // Для объединенных атрибутов с id
+                        else if (attr.id) {
+                          attrId = attr.id;
+                          attrName = attr.name || attr.attribute_name || 'Неизвестный атрибут';
+                        }
+                        else {
+                          console.warn('Атрибут без ID:', attr);
+                          return null;
+                        }
+                        
+                        const value = attributeValues[attrId];
+                        if (value === undefined || value === '' || value === null) return null;
                         
                         let displayValue = value;
                         if (attr.attribute_type === 'boolean') {
@@ -1183,8 +1221,8 @@ export default function ListingFormStepper({
                         }
                         
                         return (
-                          <div key={attr.attribute_id || attr.template_attribute_id} className="flex items-start">
-                            <span className="text-gray-500 text-sm">{attr.name}:</span>
+                          <div key={`preview-attr-${attrId}`} className="flex items-start">
+                            <span className="text-gray-500 text-sm">{attrName}:</span>
                             <span className="text-gray-900 text-sm ml-1">{displayValue}</span>
                           </div>
                         );

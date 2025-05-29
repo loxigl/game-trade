@@ -10,7 +10,7 @@ import formatPrice from '../../utils/formatPrice';
 function ExchangeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const walletId = searchParams.get('wallet_id') ? parseInt(searchParams.get('wallet_id')!) : null;
+  const walletId = searchParams?.get('wallet_id') ? parseInt(searchParams.get('wallet_id')!) : null;
   
   const { wallet, loading: walletLoading, error: walletError } = useWallet(walletId);
   const { rates, loading: ratesLoading, error: ratesError, convertCurrency } = useCurrencyExchange();
@@ -46,8 +46,9 @@ function ExchangeContent() {
     const fromRate = rates[fromCurrency] || 1;
     const toRate = rates[toCurrency] || 1;
     
-    // Конвертация через базовую валюту (обычно USD)
-    const convertedValue = (amountValue * fromRate) / toRate;
+    // Корректная формула конвертации:
+    // USD -> EUR: multiply USD by EUR/USD rate
+    const convertedValue = amountValue * (toRate / fromRate);
     setConvertedAmount(convertedValue);
   }, [amount, fromCurrency, toCurrency, rates]);
 
@@ -144,13 +145,13 @@ function ExchangeContent() {
           </svg>
           <h2 className="text-2xl font-bold mb-4">Обмен валюты выполнен!</h2>
           <p className="mb-2">
-            Вы успешно обменяли {formatPrice(conversionResponse?.from_amount, conversionResponse?.from_currency)}
+            Вы успешно обменяли {formatPrice(conversionResponse?.debit_transaction?.amount || 0, conversionResponse?.debit_transaction?.currency || '')}
           </p>
           <p className="mb-6">
-            на {formatPrice(conversionResponse?.to_amount, conversionResponse?.to_currency)}
+            на {formatPrice(conversionResponse?.credit_transaction?.amount || 0, conversionResponse?.credit_transaction?.currency || '')}
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            Курс: 1 {conversionResponse?.from_currency} = {conversionResponse?.exchange_rate} {conversionResponse?.to_currency}
+            Курс: 1 {conversionResponse?.debit_transaction?.currency || ''} = {conversionResponse?.exchange_rate || 0} {conversionResponse?.credit_transaction?.currency || ''}
           </p>
           <div className="flex justify-center space-x-4">
             <button 
@@ -246,21 +247,21 @@ function ExchangeContent() {
           
           <div className="mb-6">
             <div className="flex justify-center items-center mb-2">
-            <svg 
+              <svg 
                 className="w-6 h-6 text-gray-400" 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24" 
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth="2" 
-                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
-              ></path>
-            </svg>
-          </div>
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth="2" 
+                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                ></path>
+              </svg>
+            </div>
           
             <label htmlFor="toCurrency" className="block text-sm font-medium text-gray-700 mb-1">
               Конвертировать в

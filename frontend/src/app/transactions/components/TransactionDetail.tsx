@@ -18,7 +18,8 @@ import {
   ExclamationCircleOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
 import { 
   Transaction, 
@@ -27,6 +28,7 @@ import {
 } from '../../types/transaction';
 import TransactionStatusBadge from './TransactionStatusBadge';
 import TransactionHistoryTimeline from './TransactionHistoryTimeline';
+import ChatModal from '../../components/ChatModal';
 import * as transactionApi from '../../api/transaction';
 import formatDate from '../../utils/formatDate';
 
@@ -47,6 +49,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({ transactionId }) 
   const [modalAction, setModalAction] = useState<string>('');
   const [reason, setReason] = useState<string>('');
   const [inFavorOfSeller, setInFavorOfSeller] = useState<boolean>(true);
+  const [isChatModalOpen, setIsChatModalOpen] = useState<boolean>(false);
 
   // Загрузка данных транзакции
   useEffect(() => {
@@ -225,7 +228,15 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({ transactionId }) 
           <Card>
             <div className="flex justify-between items-center mb-4">
               <Title level={4}>Транзакция #{transaction.id}</Title>
-              <TransactionStatusBadge status={transaction.status} />
+              <Space>
+                <TransactionStatusBadge status={transaction.status} />
+                <Button
+                  icon={<MessageOutlined />}
+                  onClick={() => setIsChatModalOpen(true)}
+                >
+                  Открыть чат
+                </Button>
+              </Space>
             </div>
             
             <Descriptions bordered column={{ xxl: 3, xl: 3, lg: 2, md: 2, sm: 1, xs: 1 }}>
@@ -239,23 +250,23 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({ transactionId }) 
                 {transaction.fee?.toFixed(2) || '0.00'}
               </Descriptions.Item>
               <Descriptions.Item label="Покупатель">
-                ID: {transaction.buyerId}
+                ID: {transaction.buyer_id}
               </Descriptions.Item>
               <Descriptions.Item label="Продавец">
-                ID: {transaction.sellerId}
+                ID: {transaction.seller_id}
               </Descriptions.Item>
               <Descriptions.Item label="ID товара">
-                {transaction.listingId}
+                {transaction.listing_id}
               </Descriptions.Item>
               <Descriptions.Item label="Дата создания">
-                {formatDate(transaction.createdAt)}
+                {formatDate(transaction.created_at)}
               </Descriptions.Item>
               <Descriptions.Item label="Дата обновления">
-                {formatDate(transaction.updatedAt)}
+                {formatDate(transaction.updated_at)}
               </Descriptions.Item>
-              {transaction.expirationDate && (
+              {transaction.expiration_date && (
                 <Descriptions.Item label="Срок действия до">
-                  {formatDate(transaction.expirationDate)}
+                  {formatDate(transaction.expiration_date)}
                 </Descriptions.Item>
               )}
               {transaction.description && (
@@ -263,14 +274,14 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({ transactionId }) 
                   {transaction.description}
                 </Descriptions.Item>
               )}
-              {transaction.disputeReason && (
+              {transaction.dispute_reason && (
                 <Descriptions.Item label="Причина спора" span={3}>
-                  {transaction.disputeReason}
+                  {transaction.dispute_reason}
                 </Descriptions.Item>
               )}
-              {transaction.disputeResolution && (
+              {transaction.dispute_resolution && (
                 <Descriptions.Item label="Решение по спору" span={3}>
-                  {transaction.disputeResolution}
+                  {transaction.dispute_resolution}
                 </Descriptions.Item>
               )}
             </Descriptions>
@@ -362,6 +373,16 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({ transactionId }) 
           )}
         </Space>
       </Modal>
+
+      {/* Модальное окно чата */}
+      <ChatModal
+        visible={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        transactionId={transaction.id}
+        sellerId={transaction.seller_id}
+        buyerId={transaction.buyer_id}
+        title={`Чат по транзакции #${transaction.id}`}
+      />
     </div>
   );
 };

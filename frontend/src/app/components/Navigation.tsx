@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation';
 import { useWallets } from '../hooks/wallet';
 import formatPrice from '../utils/formatPrice';
 import { Currency } from '../types/wallet';
+import NotificationCenter from './NotificationCenter';
+import { useNotificationContext } from '../contexts/NotificationContext';
 
 export const Navigation = () => {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
@@ -20,6 +22,17 @@ export const Navigation = () => {
   const { wallets, loading: walletsLoading, authError } = useWallets();
   const [defaultWallet, setDefaultWallet] = useState<any>(null);
   
+  // Получаем контекст уведомлений
+  const {
+    notifications,
+    loading: notificationsLoading,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    handleNotificationClick
+  } = useNotificationContext();
+
   // При загрузке кошельков находим основной
   useEffect(() => {
     // Проверяем, что wallets существует, не пуст и нет ошибки аутентификации
@@ -144,6 +157,14 @@ export const Navigation = () => {
                   Мои заказы
                 </Link>
               )}
+              {isAuthenticated && (
+                <Link 
+                  href="/chats" 
+                  className={`${isActive('/chats') ? 'border-blue-500 text-blue-600  font-semibold' : 'border-transparent text-gray-700  hover:text-gray-900 '} hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200`}
+                >
+                  Мои чаты
+                </Link>
+              )}
               <Link 
                 href="/wallet" 
                 className={`${isActive('/wallet') ? 'border-blue-500 text-blue-600  font-semibold' : 'border-transparent text-gray-700  hover:text-gray-900 '} hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200`}
@@ -190,6 +211,18 @@ export const Navigation = () => {
                 </svg>
               )}
             </button>
+
+            {/* Центр уведомлений - только для авторизованных пользователей */}
+            {isAuthenticated && (
+              <NotificationCenter
+                notifications={notifications}
+                loading={notificationsLoading}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+                onNotificationClick={handleNotificationClick}
+              />
+            )}
             
             {isAuthenticated ? (
               <div className="ml-3 relative">
@@ -356,6 +389,15 @@ export const Navigation = () => {
               onClick={() => setIsMenuOpen(false)}
             >
               Мои заказы
+            </Link>
+          )}
+          {isAuthenticated && (
+            <Link 
+              href="/chats" 
+              className={`block pl-3 pr-4 py-2 border-l-4 ${isActive('/chats') ? 'border-blue-500 text-blue-600  font-semibold' : 'border-transparent text-gray-700 '} hover:bg-gray-50  hover:border-gray-300 hover:text-gray-900  text-base font-medium transition-colors duration-200`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Мои чаты
             </Link>
           )}
           <Link 

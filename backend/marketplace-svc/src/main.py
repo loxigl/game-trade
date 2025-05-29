@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Импорт роутеров
-from .routers import listings, categories, games, search, images, templates, sales, statistics
+from .routers import listings, categories, games, search, images, templates, sales, statistics,users
 from .dependencies.db import get_db
 from .config.settings import get_settings
 from .services.image_processor import ImageProcessor
@@ -64,7 +64,7 @@ app.include_router(images)
 app.include_router(templates)
 app.include_router(sales)
 app.include_router(statistics)
-
+app.include_router(users)
 # Создание экземпляра обработчика изображений
 image_processor = ImageProcessor()
 
