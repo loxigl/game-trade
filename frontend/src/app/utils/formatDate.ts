@@ -1,4 +1,6 @@
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import { parseUTCDate } from './date';
 
 /**
  * Безопасно форматирует дату с обработкой ошибок и null/undefined значений
@@ -104,4 +106,37 @@ function pluralize(count: number, one: string, few: string, many: string): strin
   } else {
     return many;
   }
+}
+
+/**
+ * Форматирует относительную дату (например, "5 минут назад")
+ * @param dateString - строка с датой или объект Date
+ * @returns отформатированная относительная дата
+ */
+export function formatRelativeDate(dateString: string | Date): string {
+  if (!dateString) return '';
+  
+  const date = typeof dateString === 'string' ? parseUTCDate(dateString) : dateString;
+  
+  return formatDistanceToNow(date, {
+    addSuffix: true,
+    locale: ru
+  });
+}
+
+/**
+ * Проверяет, превышает ли дата указанное количество дней от текущей даты
+ * @param dateString - строка с датой или объект Date
+ * @param days - количество дней
+ * @returns true, если дата старше указанного количества дней
+ */
+export function isOlderThanDays(dateString: string | Date, days: number): boolean {
+  if (!dateString) return false;
+  
+  const date = typeof dateString === 'string' ? parseUTCDate(dateString) : dateString;
+  const now = new Date();
+  
+  const diff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  
+  return diff > days;
 } 

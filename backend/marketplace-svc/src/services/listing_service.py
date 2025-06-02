@@ -6,14 +6,16 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 from sqlalchemy import asc, desc, func
+import logging
 
-
-from ..models.core import Listing, User, ListingStatus
+from ..models.core import ImageType, Listing, User, ListingStatus
 from ..models.categorization import ItemTemplate, ItemCategory, Item, ItemAttributeValue, CategoryAttribute, TemplateAttribute
 from ..schemas.marketplace import ListingCreate, ListingUpdate
 from ..schemas.base import PaginationParams
+from ..services.image_service import ImageService
 from .template_service import TemplateService
 
+logger = logging.getLogger(__name__)
 class ListingService:
     """Сервис для управления объявлениями маркетплейса"""
     
@@ -140,37 +142,33 @@ class ListingService:
         
         self.db.add(listing)
         
+        
         # Обрабатываем атрибуты предмета, если они указаны
-        if hasattr(listing_data, 'attribute_values') and listing_data.attribute_values:
+        if listing_data.attribute_values:
             for attr_value in listing_data.attribute_values:
-                # Определяем, это атрибут категории или атрибут шаблона
-                is_category_attr = hasattr(attr_value, 'attribute_id') and attr_value.attribute_id is not None
-                is_template_attr = hasattr(attr_value, 'template_attribute_id') and attr_value.template_attribute_id is not None
-                
-                if not is_category_attr and not is_template_attr:
-                    continue  # Пропускаем неверные атрибуты
-                
-                # Создаем значение атрибута
-                item_attr = ItemAttributeValue(item_id=item.id)
-                
-                if is_category_attr:
-                    item_attr.attribute_id = attr_value.attribute_id
-                elif is_template_attr:
-                    item_attr.template_attribute_id = attr_value.template_attribute_id
-                
-                # Устанавливаем значение в зависимости от типа
-                if hasattr(attr_value, 'value_string') and attr_value.value_string is not None:
-                    item_attr.value_string = attr_value.value_string
-                elif hasattr(attr_value, 'value_number') and attr_value.value_number is not None:
-                    item_attr.value_number = attr_value.value_number
-                elif hasattr(attr_value, 'value_boolean') and attr_value.value_boolean is not None:
-                    item_attr.value_boolean = attr_value.value_boolean
-                
-                self.db.add(item_attr)
+                if attr_value.attribute_id:
+                    item_attr = ItemAttributeValue(
+                        item_id=item.id,
+                        attribute_id=attr_value.attribute_id,
+                        value_string=attr_value.value_string,
+                        value_number=attr_value.value_number,
+                        value_boolean=attr_value.value_boolean
+                    )
+                    self.db.add(item_attr)
+                elif attr_value.template_attribute_id:
+                    item_attr = ItemAttributeValue(
+                        item_id=item.id,
+                        template_attribute_id=attr_value.template_attribute_id,
+                        value_string=attr_value.value_string,
+                        value_number=attr_value.value_number,
+                        value_boolean=attr_value.value_boolean
+                    )
+                    self.db.add(item_attr)
+            
         
         self.db.commit()
         self.db.refresh(listing)
-        
+        logger.info(f"Объявление создано: {listing.id}")
         return listing
     
     def update_listing(self, listing_id: int, listing_data: ListingUpdate, user: User) -> Listing:
@@ -196,7 +194,6 @@ class ListingService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для редактирования этого объявления"
             )
-        
         # Обновляем поля, если они указаны
         if listing_data.title is not None:
             listing.title = listing_data.title
@@ -213,7 +210,18 @@ class ListingService:
                 pass
             
             listing.status = listing_data.status
-        
+        image_service = ImageService(self.db)
+        if listing_data.images is not None:
+            for image in listing_data.images:
+                if image.id is not None:
+                    image_service.attach_image_to_entity(image.id, listing.id, ImageType.LISTING, user.id)
+                    if image.is_main:
+                        image_service.set_main_image(image.id, listing.id, ImageType.LISTING)
+                    if image.order_index is not None:
+                        image_service.update_image_order(image.id, image.order_index, user.id)
+        if listing_data.deleted_image_ids is not None:
+            for image_id in listing_data.deleted_image_ids:
+                image_service.delete_image(image_id)
         self.db.commit()
         self.db.refresh(listing)
         

@@ -259,11 +259,9 @@ export default function SalePage() {
           {/* Информация о продавце и покупателе */}
           <div className="grid grid-cols-2 gap-6">
             <Card size="small" title="Продавец">
-              <p><strong>ID:</strong> {sale.seller_id}</p>
               <p><strong>Имя:</strong> {sale.seller_name || 'Не указано'}</p>
             </Card>
             <Card size="small" title="Покупатель">
-              <p><strong>ID:</strong> {sale.buyer_id}</p>
               <p><strong>Имя:</strong> {sale.buyer_name || 'Не указано'}</p>
             </Card>
           </div>
@@ -317,28 +315,7 @@ export default function SalePage() {
               </div>
             )}
 
-            {/* Кнопка для открытия чата */}
-            {sale.chat_id && (
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Общение</h3>
-                <Button
-                  type="default"
-                  icon={<MessageOutlined />}
-                  onClick={() => setShowChat(!showChat)}
-                  block
-                >
-                  {showChat ? 'Скрыть чат' : 'Открыть чат'}
-                </Button>
-              </div>
-            )}
           </div>
-
-          {/* Чат */}
-          {showChat && sale.chat_id && (
-            <div className="mt-4 border rounded-lg overflow-hidden">
-              <ChatWidget chatId={sale.chat_id} />
-            </div>
-          )}
         </div>
       </div>
 

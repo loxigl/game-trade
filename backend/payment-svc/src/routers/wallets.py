@@ -11,7 +11,7 @@ from ..database.connection import get_db
 from ..models.wallet import Currency, WalletStatus
 from ..models.transaction import TransactionStatus
 from ..schemas.wallet import (
-    WalletCreate, WalletUpdate, WalletResponse, WalletListResponse,
+    WalletCreate, WalletTransactionResponseMinimal, WalletUpdate, WalletResponse, WalletListResponse,
     WalletBalanceResponse, WalletTransactionResponse, WalletTransactionListResponse,
     CurrencyConversionRequest, WithdrawalRequest, WithdrawalVerificationRequest,
     WithdrawalResponse, WithdrawalListResponse, WalletTransactionCreate
@@ -370,11 +370,28 @@ async def convert_currency(
         raise HTTPException(status_code=403, detail="Недостаточно прав для операций с этим кошельком")
     
     debit_tx, credit_tx = await wallet_service.convert_currency(wallet_id, conversion_data)
+    debit_tx_response = WalletTransactionResponseMinimal(
+        id=debit_tx.id,
+        wallet_id=debit_tx.wallet_id,
+        amount=debit_tx.amount,
+        currency=debit_tx.currency,
+        type=debit_tx.type,
+
+        created_at=debit_tx.created_at,
+    )
+    credit_tx_response = WalletTransactionResponseMinimal(
+        id=credit_tx.id,
+        wallet_id=credit_tx.wallet_id,
+        amount=credit_tx.amount,
+        currency=credit_tx.currency,
+        type=credit_tx.type,
+        created_at=credit_tx.created_at,
+    )
     
     return {
         "success": True,
-        "debit_transaction": debit_tx,
-        "credit_transaction": credit_tx,
+        "debit_transaction": debit_tx_response,
+        "credit_transaction": credit_tx_response,
         "exchange_rate": credit_tx.amount / debit_tx.amount
     }
 

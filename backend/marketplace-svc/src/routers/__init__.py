@@ -10,6 +10,7 @@ from .images import router as images_router
 from .templates import router as templates_router
 from .sales import router as sales_router
 from .statistics import router as statistics_router
+from .users import router as users_router
 # Экспортируем роутеры для удобства импорта
 listings = listings_router
 categories = categories_router
@@ -19,3 +20,4 @@ images = images_router
 templates = templates_router 
 sales = sales_router
 statistics = statistics_router
+users = users_router

@@ -24,6 +24,7 @@ class ImageCreate(ImageBase):
 
 class ImageUpdate(BaseModel):
     """Схема для обновления изображения"""
+    id: Optional[int] = None
     is_main: Optional[bool] = None
     order_index: Optional[int] = None
 
@@ -72,11 +73,21 @@ class ListingBase(BaseModel):
         from_attributes = True
 
 
+class AttributeValueCreate(BaseModel):
+    """Схема для создания значения атрибута"""
+    attribute_id: Optional[int] = None
+    template_attribute_id: Optional[int] = None
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+
+
 class ListingCreate(ListingBase):
     """Схема для создания объявления"""
+    id: Optional[int] = None
     item_id: Optional[int] = None
     category_id: Optional[int] = None
-    attribute_values: Optional[List[Dict[str, Any]]] = None
+    attribute_values: Optional[List[AttributeValueCreate]] = None
 
 
 class ListingUpdate(BaseModel):
@@ -86,6 +97,9 @@ class ListingUpdate(BaseModel):
     price: Optional[float] = None
     currency: Optional[str] = None
     is_negotiable: Optional[bool] = None
+    status: Optional[ListingStatus] = None
+    images: Optional[List[ImageUpdate]] = None
+    deleted_image_ids: Optional[List[int]] = None
 
     class Config:
         from_attributes = True

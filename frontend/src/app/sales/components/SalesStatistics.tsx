@@ -17,7 +17,7 @@ import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend,
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import { getSellerStatistics, getTransactionsSummary, generateTransactionsReport } from '../../api/transaction';
-import { SellerStatistics as SellerStatsType, TransactionSummary } from '../../types/transaction';
+import { GameDistribution, SellerStatistics as SellerStatsType, TransactionSummary } from '../../types/transaction';
 
 // Регистрируем необходимые компоненты Chart.js
 ChartJS.register(
@@ -43,7 +43,7 @@ const SalesStatistics: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Date, Date] | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<SellerStatsType | null>(null);
-  const [gameDistribution, setGameDistribution] = useState<TransactionSummary[]>([]);
+  const [gameDistribution, setGameDistribution] = useState<GameDistribution[]>([]);
 
   // Получение статистики продаж
   useEffect(() => {
@@ -63,13 +63,7 @@ const SalesStatistics: React.FC = () => {
         setStats(statsData);
         
         // Получаем распределение по играм
-        const gameData = await getTransactionsSummary(
-          user.id,
-          'game',
-          timeRange as any,
-          dateRange ? dateRange[0] : undefined,
-          dateRange ? dateRange[1] : undefined
-        );
+        const gameData = statsData.gameDistribution;
         
         setGameDistribution(gameData);
       } catch (error) {
@@ -152,7 +146,7 @@ const SalesStatistics: React.FC = () => {
 
   // Данные для графика распределения по играм
   const gameDistributionChartData = {
-    labels: gameDistribution.map(item => item.key),
+    labels: gameDistribution.map(item => item.game),
     datasets: [
       {
         label: 'Доля продаж',
@@ -369,8 +363,8 @@ const SalesStatistics: React.FC = () => {
                   <ul className="space-y-2">
                     {gameDistribution.map((item, index) => (
                       <li key={index} className="flex justify-between items-center">
-                        <span>{item.key}</span>
-                        <span className="font-medium">{item.count} ({item.percentage}%)</span>
+                        <span>{item.game}</span>
+                        <span className="font-medium">{item.sales} ({item.percentage}%)</span>
                       </li>
                     ))}
                   </ul>

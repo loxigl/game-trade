@@ -1,189 +1,193 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Card, Input, Button, Avatar, List, Typography, Empty, Divider, Badge } from 'antd';
-import { SendOutlined, UserOutlined, CommentOutlined, PaperClipOutlined, SmileOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Button, Space, Card, Typography, Spin, Alert } from 'antd';
+import { CommentOutlined, UserOutlined } from '@ant-design/icons';
+import { useAuth } from '../../../hooks/auth';
+import { useChat } from '../../../hooks/useChat';
+import { useUsers } from '../../../hooks/useUsers';
+import ChatModal from '../../../components/ChatModal';
+import { getTransactionDetails } from '../../../api/transaction';
 
-const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface ChatPlaceholderProps {
   transactionId: number;
-  recipientName?: string;
 }
 
-const ChatPlaceholder: React.FC<ChatPlaceholderProps> = ({ transactionId, recipientName = "Продавец" }) => {
-  const [message, setMessage] = useState('');
-  
-  // Заглушка - демонстрационные сообщения
-  const mockMessages = [
-    {
-      id: 1,
-      sender: 'seller',
-      senderName: recipientName,
-      content: 'Здравствуйте! Благодарю за покупку. Если у вас есть вопросы по товару, я с радостью отвечу.',
-      timestamp: new Date(Date.now() - 3600000 * 24).toISOString()
-    },
-    {
-      id: 2,
-      sender: 'buyer',
-      senderName: 'Вы',
-      content: 'Добрый день! Подскажите, когда примерно будет доставка?',
-      timestamp: new Date(Date.now() - 3600000 * 12).toISOString()
-    },
-    {
-      id: 3,
-      sender: 'seller',
-      senderName: recipientName,
-      content: 'Отправим завтра, доставка займет 2-3 дня. Я сообщу вам трек-номер, как только отправим.',
-      timestamp: new Date(Date.now() - 3600000 * 10).toISOString()
-    }
-  ];
+export default function ChatPlaceholder({ transactionId }: ChatPlaceholderProps) {
+  const { user, isAuthenticated } = useAuth();
+  const { connected } = useChat();
+  const { getUserName, getUserAvatar, preloadUsers } = useUsers();
+  const [chatModalVisible, setChatModalVisible] = useState(false);
+  const [transactionDetails, setTransactionDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const loadedUsersRef = useRef<boolean>(false);
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // Здесь будет логика отправки сообщения после реализации чата
-      console.log(`Отправка сообщения: ${message}`);
-      setMessage('');
+  useEffect(() => {
+    const fetchTransactionDetails = async () => {
+      try {
+        setLoading(true);
+        const details = await getTransactionDetails(transactionId);
+        setTransactionDetails(details);
+        
+        // Предзагрузка информации о пользователях
+        if (details && !loadedUsersRef.current) {
+          const userIds = [];
+          
+          if (details.transaction?.seller_id) userIds.push(details.transaction.seller_id);
+          if (details.transaction?.buyer_id) userIds.push(details.transaction.buyer_id);
+          if (details.seller?.id) userIds.push(details.seller.id);
+          if (details.buyer?.id) userIds.push(details.buyer.id);
+          
+          // Если есть ID пользователей, загружаем их данные
+          if (userIds.length > 0) {
+            console.log('Предзагрузка пользователей в ChatPlaceholder:', userIds);
+            preloadUsers(userIds)
+              .then(() => { loadedUsersRef.current = true; })
+              .catch(err => console.error('Ошибка загрузки данных пользователей:', err));
+          }
+        }
+      } catch (err) {
+        console.error('Ошибка получения деталей транзакции:', err);
+        setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (transactionId) {
+      fetchTransactionDetails();
     }
+    
+    // Сбрасываем флаг загрузки пользователей при размонтировании
+    return () => {
+      loadedUsersRef.current = false;
+    };
+  }, [transactionId, preloadUsers]);
+
+  const openChat = () => {
+    setChatModalVisible(true);
   };
 
-  // Форматирование даты для сообщений
-  const formatMessageDate = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const closeChat = () => {
+    setChatModalVisible(false);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <Alert
+        message="Требуется авторизация"
+        description="Войдите в систему для доступа к чату"
+        type="warning"
+        showIcon
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+        <Spin size="large" tip="Загрузка информации о чате..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert
+        message="Ошибка загрузки"
+        description={error}
+        type="error"
+        showIcon
+      />
+    );
+  }
+
+  // Извлекаем данные для чата из транзакции
+  const { transaction, sale, seller, buyer } = transactionDetails || {};
+  const listingId = transaction?.listing_id || sale?.listing_id;
+  const sellerId = transaction?.seller_id || sale?.seller_id;
+  const buyerId = transaction?.buyer_id || sale?.buyer_id;
+
+  // Получаем имена пользователей
+  const sellerName = seller?.username || getUserName(sellerId);
+  const buyerName = buyer?.username || getUserName(buyerId);
+
+  if (!listingId || !sellerId || !buyerId) {
+    return (
+      <Alert
+        message="Недостаточно данных"
+        description="Не удалось определить участников чата для данной транзакции"
+        type="warning"
+        showIcon
+      />
+    );
+  }
 
   return (
-    <Card 
-      title={
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Badge dot status="success" className="mr-2" />
-            <span>Чат по сделке</span>
+    <div style={{ padding: '16px' }}>
+      <Card 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CommentOutlined />
+            <span>Чат по транзакции</span>
           </div>
-          <div>
-            <Badge count={3} style={{ backgroundColor: '#52c41a' }} />
-          </div>
-        </div>
-      }
-      className="chat-card h-full"
-      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
-      bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px', overflow: 'hidden' }}
-      bordered={true}
-    >
-      <div 
-        style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          marginBottom: '12px', 
-          display: 'flex',
-          flexDirection: 'column'
-        }}
+        }
+        style={{ textAlign: 'center' }}
       >
-        {mockMessages.length > 0 ? (
-          <List
-            itemLayout="horizontal"
-            dataSource={mockMessages}
-            style={{ width: '100%' }}
-            renderItem={item => (
-              <List.Item style={{ 
-                padding: '4px 0',
-                display: 'flex', 
-                justifyContent: item.sender === 'buyer' ? 'flex-end' : 'flex-start',
-                border: 'none'
-              }}>
-                <div 
-                  style={{ 
-                    display: 'flex',
-                    flexDirection: item.sender === 'buyer' ? 'row-reverse' : 'row',
-                    maxWidth: '80%',
-                    alignItems: 'flex-start'
-                  }}
-                >
-                  <Avatar 
-                    icon={<UserOutlined />} 
-                    style={{ 
-                      backgroundColor: item.sender === 'buyer' ? '#1890ff' : '#52c41a',
-                      margin: item.sender === 'buyer' ? '0 0 0 8px' : '0 8px 0 0',
-                      flexShrink: 0
-                    }} 
-                  />
-                  <div 
-                    style={{ 
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      background: item.sender === 'buyer' ? '#e6f7ff' : '#f0f2f5',
-                      position: 'relative',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <Text strong style={{ display: 'block', marginBottom: '4px' }}>
-                      {item.senderName}
-                    </Text>
-                    <div style={{ wordBreak: 'break-word' }}>{item.content}</div>
-                    <Text type="secondary" style={{ fontSize: '11px', display: 'block', marginTop: '4px', textAlign: 'right' }}>
-                      {formatMessageDate(item.timestamp)}
-                    </Text>
-                  </div>
-                </div>
-              </List.Item>
-            )}
-          />
-        ) : (
-          <Empty 
-            description="Нет сообщений" 
-            style={{ margin: 'auto' }}
-            image={Empty.PRESENTED_IMAGE_SIMPLE} 
-          />
-        )}
-      </div>
-      
-      <Divider style={{ margin: '8px 0' }} />
-      
-      <div style={{ marginTop: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <TextArea
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            placeholder="Введите сообщение..."
-            autoSize={{ minRows: 1, maxRows: 4 }}
-            style={{ flex: 1, marginRight: '8px', resize: 'none' }}
-            onPressEnter={e => {
-              if (!e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <Button
-              shape="circle"
-              icon={<PaperClipOutlined />}
-              style={{ marginBottom: '4px' }}
-              title="Прикрепить файл"
-            />
-            <Button 
-              type="primary" 
-              shape="circle"
-              icon={<SendOutlined />}
-              onClick={handleSendMessage}
-              disabled={!message.trim()}
-              title="Отправить сообщение"
-            />
-          </div>
+        <div style={{ marginBottom: '16px' }}>
+          <Text type="secondary">
+            Общение между покупателем и продавцом по объявлению #{listingId}
+          </Text>
         </div>
-        <div style={{ fontSize: '11px', color: '#8c8c8c', marginTop: '4px', textAlign: 'center' }}>
-          Чат работает в режиме демонстрации. Ваши сообщения не сохраняются.
+        
+        <div style={{ marginBottom: '16px' }}>
+          <Space direction="vertical" size="small">
+            <div>
+              <UserOutlined /> <Text strong>Продавец:</Text> {sellerName}
+            </div>
+            <div>
+              <UserOutlined /> <Text strong>Покупатель:</Text> {buyerName}
+            </div>
+          </Space>
         </div>
-      </div>
-    </Card>
-  );
-};
 
-export default ChatPlaceholder; 
+        <div style={{ marginBottom: '16px' }}>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            Статус подключения: {connected ? '🟢 Подключен' : '🔴 Не подключен'}
+          </Text>
+        </div>
+        
+        <Button 
+          type="primary" 
+          icon={<CommentOutlined />}
+          onClick={openChat}
+          size="large"
+          disabled={!connected}
+        >
+          Открыть чат
+        </Button>
+        
+        {!connected && (
+          <div style={{ marginTop: '8px' }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              Ожидание подключения к серверу чатов...
+            </Text>
+          </div>
+        )}
+      </Card>
+
+      {/* Модальное окно чата */}
+      <ChatModal
+        visible={chatModalVisible}
+        onClose={closeChat}
+        transactionId={transactionId}
+        sellerId={sellerId}
+        buyerId={buyerId}
+        title={`Чат по транзакции #${transactionId}`}
+      />
+    </div>
+  );
+} 
