@@ -36,7 +36,7 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction }) => {
               <Text strong>{transaction.amount.toFixed(2)}</Text>
             </Space>
             <Space>
-              {transaction.type === 'sale' || transaction.type === 'seller_payout' ? (
+              {transaction.type === 'sale' || transaction.type === 'purchase' ? (
                 <>
                   <ShopOutlined style={{ color: '#52c41a' }} />
                   <Text>Моя продажа</Text>
@@ -50,11 +50,11 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction }) => {
             </Space>
             <Space>
               <UserOutlined /> 
-              <Text>{transaction.type === 'sale' || transaction.type === 'seller_payout' ? 'Покупатель' : 'Продавец'}: ID {transaction.type === 'sale' || transaction.type === 'seller_payout' ? transaction.buyerId : transaction.sellerId}</Text>
+              <Text>{transaction.type === 'sale' || transaction.type === 'purchase' ? 'Покупатель' : 'Продавец'}: ID {transaction.type === 'sale' || transaction.type === 'purchase' ? transaction.buyer_id : transaction.seller_id}</Text>
             </Space>
             <Space>
               <ClockCircleOutlined /> 
-              <Text>{formatDate(transaction.createdAt, 'dd.MM.yyyy HH:mm')}</Text>
+              <Text>{formatDate(transaction.created_at, 'dd.MM.yyyy HH:mm')}</Text>
             </Space>
           </Space>
         </div>
@@ -62,10 +62,10 @@ const TransactionCard: React.FC<TransactionCardProps> = ({ transaction }) => {
         <div className="flex flex-col items-start md:items-end">
           <TransactionStatusBadge status={transaction.status} />
           
-          {transaction.expirationDate && (
+          {transaction.expiration_date && (
             <Tooltip title="Дата истечения срока">
               <Text type="secondary" className="mt-2">
-                Истекает: {formatDate(transaction.expirationDate, 'dd.MM.yyyy HH:mm')}
+                Истекает: {formatDate(transaction.expiration_date, 'dd.MM.yyyy HH:mm')}
               </Text>
             </Tooltip>
           )}

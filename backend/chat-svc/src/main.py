@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
 import asyncio
 
+from .database.connection import create_tables
+from .routes import chats_router, websockets_router
 from .services.rabbitmq_service import get_rabbitmq_service
 from .services.message_handler import setup_rabbitmq_consumers
 
@@ -17,7 +19,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="GameTrade Chat Service",
     description="API для обмена сообщениями между пользователями",
-    version="0.1.0"
+    version="0.1.0",
+    root_path="/api/chat"
 )
 
 # Настройка CORS
@@ -29,6 +32,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Подключение роутов
+app.include_router(chats_router)
+app.include_router(websockets_router, prefix="/ws")
+
 @app.on_event("startup")
 async def startup_event():
     """
@@ -36,6 +43,10 @@ async def startup_event():
     Инициализирует соединение с RabbitMQ и настраивает потребителей сообщений
     """
     try:
+        # Создание таблиц в базе данных
+        create_tables()
+        logger.info("Database tables created successfully")
+        
         # Инициализация соединения с RabbitMQ
         rabbitmq_service = get_rabbitmq_service()
         await rabbitmq_service.connect()
@@ -45,7 +56,7 @@ async def startup_event():
         await setup_rabbitmq_consumers()
         logger.info("RabbitMQ consumers are set up")
     except Exception as e:
-        logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
+        logger.error(f"Failed to initialize service: {str(e)}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -67,40 +78,6 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "chat"}
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: dict[str, list[WebSocket]] = {}
-
-    async def connect(self, websocket: WebSocket, chat_id: str):
-        await websocket.accept()
-        if chat_id not in self.active_connections:
-            self.active_connections[chat_id] = []
-        self.active_connections[chat_id].append(websocket)
-
-    def disconnect(self, websocket: WebSocket, chat_id: str):
-        if chat_id in self.active_connections:
-            if websocket in self.active_connections[chat_id]:
-                self.active_connections[chat_id].remove(websocket)
-            if not self.active_connections[chat_id]:
-                del self.active_connections[chat_id]
-
-    async def send_message(self, message: str, chat_id: str):
-        if chat_id in self.active_connections:
-            for connection in self.active_connections[chat_id]:
-                await connection.send_text(message)
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/{chat_id}")
-async def websocket_endpoint(websocket: WebSocket, chat_id: str):
-    await manager.connect(websocket, chat_id)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await manager.send_message(f"{data}", chat_id)
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, chat_id)
 
 if __name__ == "__main__":
     import uvicorn

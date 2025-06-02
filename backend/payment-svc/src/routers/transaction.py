@@ -210,12 +210,17 @@ async def get_transactions(
     page_size: int = Query(10, ge=1, le=100, description="Размер страницы"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-    role: Optional[str] = Query(None, description="Роль пользователя")
+    role: Optional[str] = Query(None, description="Роль пользователя"),
+    is_seller_view: bool = Query(False, description="Вид транзакций продавца")
 ):
     """
     Получить список транзакций с фильтрацией и пагинацией
     """
     try:
+        if is_seller_view:
+            role = "seller"
+        else:
+            role = "buyer"
         transaction_service = get_transaction_service(db)
         
         # Получаем транзакции с учетом пагинации

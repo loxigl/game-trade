@@ -10,6 +10,7 @@ from ..models.core import Sale, SaleStatus, Listing, User, Chat, Wallet, Transac
 from ..database.connection import get_db
 from ..config.settings import get_settings
 from .rabbitmq_service import get_rabbitmq_service
+from .chat_client import get_chat_client
 #from ..services.chat_service import ChatService
 import logging
 
@@ -22,6 +23,7 @@ class SaleService:
         self.db = db
         self.settings = get_settings()
         self.rabbitmq = get_rabbitmq_service()
+        self.chat_client = get_chat_client()
         # self.chat_service = ChatService(db)
         # Регистрируем обработчик для получения подтверждения о завершении транзакции
         asyncio.create_task(self._setup_message_handlers())
@@ -331,12 +333,27 @@ class SaleService:
         if listing.seller_id == buyer_id:
             raise ValueError("Нельзя купить свой собственный товар")
         
-        # TODO: Временно отключено создание чата, пока не реализован ChatService
-        # chat = await self.chat_service.create_chat(
-        #     title=f"Сделка #{listing.id}",
-        #     participants=[buyer_id, listing.seller_id],
-        #     type="sale"
-        # )
+        # Создаем чат для общения покупателя и продавца
+        chat = None
+        try:
+            # Получаем системный токен из настроек
+            system_token = self.settings.SYSTEM_TOKEN
+            
+            chat = await self.chat_client.get_or_create_listing_chat(
+                listing_id=listing_id,
+                buyer_id=buyer_id,
+                seller_id=listing.seller_id,
+                listing_title=listing.title,
+                system_token=system_token
+            )
+            
+            if chat:
+                logger.info(f"Chat created/found for listing {listing_id}: {chat.get('id')}")
+            else:
+                logger.warning(f"Failed to create chat for listing {listing_id}")
+        except Exception as e:
+            logger.error(f"Error creating chat for listing {listing_id}: {str(e)}")
+            # Не прерываем создание продажи из-за ошибки чата
         
         # Получаем wallet_id, если он не был передан
         if wallet_id is None:
@@ -353,11 +370,12 @@ class SaleService:
             price=listing.price,
             currency=listing.currency,
             status=SaleStatus.PENDING.value,
-            # chat_id=chat.id,  # Временно отключено
+            chat_id=chat.get('id') if chat else None,  # Сохраняем ID чата
             description=f"Покупка товара из объявления #{listing.id}",
             extra_data={
                 "listing_title": listing.title,
-                "wallet_id": wallet_id
+                "wallet_id": wallet_id,
+                "chat_data": chat if chat else None  # Сохраняем данные чата в extra_data
             }
         )
         
