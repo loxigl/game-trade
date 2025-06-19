@@ -18,6 +18,21 @@ configMapGenerator:
     literals:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
+  - name: marketplace-svc-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+  - name: payment-svc-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+  - name: chat-svc-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
 
 patchesStrategicMerge:
   - postgres-dev.yaml

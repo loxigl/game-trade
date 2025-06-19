@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres
+  name: postgres-auth
 spec:
   replicas: 1
   template:
@@ -25,9 +25,111 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc
+  name: postgres-auth-pvc
 spec:
   resources:
     requests:
       storage: 50Gi
-  storageClassName: premium 
+  storageClassName: premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-marketplace
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: postgres
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-marketplace-pvc
+spec:
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-payment
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: postgres
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-payment-pvc
+spec:
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: premium
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-chat
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: postgres
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-chat-pvc
+spec:
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: premium
