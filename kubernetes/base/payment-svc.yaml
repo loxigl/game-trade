@@ -1,57 +1,62 @@
+# Payment service
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: auth-svc
+  name: payment-svc
   namespace: gametrade
   labels:
-    app: auth-svc
+    app: payment-svc
 spec:
   selector:
-    app: auth-svc
+    app: payment-svc
   ports:
-    - port: 8000
-      targetPort: 8000
+    - port: 8002
+      targetPort: 8002
       name: http
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: auth-svc-config
+  name: payment-svc-config
   namespace: gametrade
 data:
   .env: |
-    DATABASE_URL=postgresql://gametrade:gametrade@postgres-auth:5432/auth_db
-    REDIS_URL=redis://redis:6379/0
-    JWT_SECRET=changeThisInProduction
+    DATABASE_URL=postgresql://gametrade:gametrade@postgres-payment:5432/payment_db
+    REDIS_URL=redis://redis:6379/2 # Использовать разные БД Redis для разных сервисов
+    RABBITMQ_URL=amqp://gametrade:gametrade@rabbitmq:5672/
+    AUTH_SERVICE_URL=http://auth-svc:8000
+    MARKETPLACE_SERVICE_URL=http://marketplace-svc:8001
     ENVIRONMENT=production
     LOG_LEVEL=INFO
     API_PREFIX=/api
+    # SERVICE_SPECIFIC_ENV_VARS
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-svc
+  name: payment-svc
   namespace: gametrade
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: auth-svc
+      app: payment-svc
   template:
     metadata:
       labels:
-        app: auth-svc
+        app: payment-svc
     spec:
       containers:
-        - name: auth-svc
-          image: gametrade/auth-svc:latest
+        - name: payment-svc
+          image: gametrade/payment-svc:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - containerPort: 8002
               name: http
           envFrom:
             - configMapRef:
-                name: auth-svc-config
+                name: payment-svc-config
           resources:
             requests:
               memory: "128Mi"
@@ -62,20 +67,20 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8002
             initialDelaySeconds: 10
             periodSeconds: 30
           livenessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8002
             initialDelaySeconds: 30
             periodSeconds: 60
           volumeMounts:
-            - name: auth-svc-config
+            - name: payment-svc-config
               mountPath: /app/.env
               subPath: .env
       volumes:
-        - name: auth-svc-config
+        - name: payment-svc-config
           configMap:
-            name: auth-svc-config 
+            name: payment-svc-config 
