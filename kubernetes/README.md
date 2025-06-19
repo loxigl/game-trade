@@ -8,11 +8,17 @@
 kubernetes/
 ├── base/                       # Базовые манифесты для всех окружений
 │   ├── namespace.yaml          # Определение пространства имен
-│   ├── postgres.yaml           # Конфигурация базы данных
+│   ├── postgres-auth.yaml         # БД сервиса auth
+│   ├── postgres-marketplace.yaml  # БД сервиса marketplace
+│   ├── postgres-payment.yaml      # БД сервиса payment
+│   ├── postgres-chat.yaml         # БД сервиса chat
 │   ├── redis.yaml              # Конфигурация кэш-сервера
 │   ├── rabbitmq.yaml           # Конфигурация сервера очередей сообщений
 │   ├── nginx.yaml              # Конфигурация API Gateway
 │   ├── auth-svc.yaml           # Сервис авторизации
+│   ├── marketplace-svc.yaml    # Сервис маркетплейса
+│   ├── payment-svc.yaml        # Сервис платежей
+│   ├── chat-svc.yaml           # Сервис чата
 │   ├── service-template.yaml   # Шаблон для других сервисов
 │   ├── autoscaler-template.yaml # Шаблон для автомасштабирования
 │   └── kustomization.yaml      # Kustomize конфигурация для базового уровня
@@ -21,13 +27,13 @@ kubernetes/
 │   ├── dev/                    # Окружение разработки
 │   │   ├── kustomization.yaml  # Kustomize конфигурация для dev
 │   │   ├── patches/            # Патчи для dev-окружения
-│   │   ├── postgres-dev.yaml   # Специфические настройки PostgreSQL для dev
+│   │   ├── postgres-dev.yaml   # Настройки PostgreSQL для всех сервисов в dev
 │   │   └── redis-dev.yaml      # Специфические настройки Redis для dev
 │   │
 │   └── prod/                   # Производственное окружение
 │       ├── kustomization.yaml  # Kustomize конфигурация для prod
 │       ├── patches/            # Патчи для prod-окружения
-│       ├── postgres-prod.yaml  # Специфические настройки PostgreSQL для prod
+│       ├── postgres-prod.yaml  # Настройки PostgreSQL для всех сервисов в prod
 │       ├── redis-prod.yaml     # Специфические настройки Redis для prod
 │       ├── nginx-prod.yaml     # Специфические настройки NGINX для prod
 │       └── auth-svc-prod.yaml  # Специфические настройки сервиса auth для prod
