@@ -1,85 +1,105 @@
-# GameTrade - P2P-маркетплейс для безопасного обмена игровыми ценностями
+# GameTrade — P2P-маркетплейс для геймеров
 
-GameTrade - это платформа для безопасной и легальной торговли внутриигровыми предметами, валютами и аккаунтами. Сервис обеспечивает безопасность сделок с помощью системы гарантированных сделок и строгой верификации участников.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-green)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-5-red)](https://redis.io/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12-orange)](https://www.rabbitmq.com/)
 
-## Структура проекта
+> **GameTrade** — это современная платформа для безопасного обмена внутриигровыми ценностями, аккаунтами и услугами между игроками. Проект построен на микросервисной архитектуре, поддерживает мультивалютные платежи, эскроу, чаты, продвинутую админку и масштабируемую инфраструктуру.
 
-Проект использует монорепозиторную структуру:
+---
+
+## Архитектура платформы
 
 ```
-├── backend/
-│   ├── auth-svc/         # Сервис аутентификации и авторизации
-│   ├── marketplace-svc/  # Сервис маркетплейса (объявления, поиск, фильтрация)
-│   ├── payment-svc/      # Сервис платежей и финансовых операций
-│   └── chat-svc/         # Сервис обмена сообщениями
-├── frontend/             # Next.js приложение (клиентская часть)
-├── shared/               # Общие библиотеки и утилиты
-└── docker-compose.yml    # Конфигурация для локальной разработки
+[ Next.js (Frontend) ]
+         |
+         v
+[ API Gateway (опционально) ]
+   |      |      |      |
+   v      v      v      v
+[auth] [market] [pay] [chat]  <---> [shared]
+   |      |      |      |
+   v      v      v      v
+[ PostgreSQL | Redis | RabbitMQ ]
+```
+- **Frontend:** Next.js (React)
+- **Backend:** auth-svc, marketplace-svc, payment-svc, chat-svc (FastAPI)
+- **Инфраструктура:** PostgreSQL, Redis, RabbitMQ, Docker, Kubernetes
+
+---
+
+## Возможности платформы
+- P2P-маркетплейс с фильтрами, категориями, играми
+- Безопасные сделки через эскроу и мультивалютные кошельки
+- Встроенные чаты (личные, групповые, по сделкам)
+- Админ-панель для управления пользователями, ролями, контентом
+- Интеграция с платежными системами, поддержка комиссий
+- Уведомления, статистика, отчёты, поддержка API
+
+---
+
+## Быстрый старт
+
+### 1. Клонирование репозитория
+```bash
+git clone https://github.com/your-org/game-trade.git
+cd game-trade
 ```
 
-## Технологический стек
+### 2. Запуск всех сервисов через Docker Compose
+```bash
+docker-compose up --build
+```
 
-- **Фронтенд**: Next.js, TypeScript, Tailwind CSS
-- **Бэкенд**: Python, FastAPI, SQLAlchemy, Pydantic
-- **База данных**: PostgreSQL
-- **Кеширование**: Redis
-- **Очереди сообщений**: RabbitMQ
-- **Контейнеризация**: Docker, Kubernetes
-- **CI/CD**: GitHub Actions
-- **Мониторинг**: Prometheus, Grafana
+### 3. Локальный запуск сервисов
+- Backend: см. `backend/*/README.md`
+- Frontend: см. `frontend/README.md`
 
-## Начало работы
+### 4. Открыть в браузере
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Документация API: [http://localhost:8000/docs](http://localhost:8000/docs) (auth-svc и др.)
 
-### Предварительные требования
+---
 
-- Python 3.10 или выше
-- Node.js (>= 18.0.0)
-- npm (>= 9.0.0)
-- Docker и docker-compose
-- Git
+## Сервисы и документация
+- **Frontend:** [`frontend/`](./frontend/README.md)
+- **Auth Service:** [`backend/auth-svc/`](./backend/auth-svc/README.md)
+- **Marketplace Service:** [`backend/marketplace-svc/`](./backend/marketplace-svc/README.md)
+- **Payment Service:** [`backend/payment-svc/`](./backend/payment-svc/README.md)
+- **Chat Service:** [`backend/chat-svc/`](./backend/chat-svc/README.md)
+- **Общие библиотеки:** [`backend/shared/`](./backend/shared/README.md)
+- **Kubernetes/DevOps:** [`kubernetes/`](./kubernetes/README.md)
 
-### Установка и запуск
+---
 
-1. Клонируйте репозиторий:
-   ```
-   git clone https://github.com/yourusername/gametrade.git
-   cd gametrade
-   ```
+## Технологии
 
-2. Установите зависимости:
-   ```
-   # Для фронтенда
-   npm install
-   
-   # Для бэкенда (в каждом сервисе)
-   cd backend/auth-svc
-   python -m venv venv
-   source venv/bin/activate  # или venv\Scripts\activate на Windows
-   pip install -r requirements.txt
-   ```
+| Категория   | Технологии                                      | Назначение                                 |
+|-------------|--------------------------------------------------|--------------------------------------------|
+| Frontend    | Next.js, React, TypeScript, Ant Design, TailwindCSS | UI, SSR, SPA, стилизация, компоненты       |
+| Backend     | FastAPI, Python, SQLAlchemy, Pydantic           | REST API, бизнес-логика, ORM, валидация    |
+| Database    | PostgreSQL                                      | Хранение данных пользователей, сделок      |
+| Кеш/Очереди | Redis, RabbitMQ                                 | Кеш, очереди событий, rate limiting        |
+| DevOps      | Docker, Docker Compose, Kubernetes, Nginx        | Контейнеризация, оркестрация, прокси       |
+| Мониторинг  | Prometheus, Grafana                             | Метрики, мониторинг, алерты                |
+| Тесты       | Pytest, httpx, Jest, Testing Library             | Юнит- и интеграционные тесты               |
 
-3. Запустите локальную среду разработки:
-   ```
-   docker-compose up
-   ```
+---
 
-4. Запустите фронтенд отдельно:
-   ```
-   npm run start:frontend
-   ```
+## Как внести вклад
+1. Форкни репозиторий и создай новую ветку
+2. Сделай изменения и добавь тесты
+3. Оформи Pull Request с описанием изменений
+4. Следуй code style и best practices (см. README сервисов)
 
-5. Откройте браузер и перейдите по адресу: http://localhost:3000
+---
 
-## Разработка
-
-### Полезные команды
-
-- `npm run start:all` - Запуск всех сервисов через docker-compose
-- `npm run start:frontend` - Запуск Next.js приложения в режиме разработки
-- `npm run lint` - Проверка кода с помощью ESLint
-- `npm run test` - Запуск тестов
-- `npm run format` - Форматирование кода с помощью Prettier
-
-## Лицензия
-
-[MIT](LICENSE) 
+## Контакты и поддержка
+- Вопросы и баги: через Issues в репозитории
+- Подробнее о каждом сервисе — см. соответствующие README 

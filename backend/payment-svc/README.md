@@ -1,88 +1,143 @@
-# Payment Service (payment-svc)
+# GameTrade Payment Service (payment-svc)
 
-Микросервис для управления платежами, транзакциями и кошельками пользователей маркетплейса.
+## Описание
 
-## Функциональные возможности
+**payment-svc** — микросервис для управления платежами, кошельками, транзакциями, эскроу и выводом средств на платформе GameTrade. Сервис реализован на FastAPI, использует PostgreSQL для хранения данных, RabbitMQ для событий и Redis для кеширования и идемпотентности. Поддерживает мультивалютность, комиссии, безопасные сделки через эскроу и интеграцию с другими сервисами платформы.
 
-### Управление транзакциями
-- Создание транзакций
-- Перевод средств в Escrow
-- Завершение транзакций (выплата продавцу)
-- Возврат средств покупателю
-- Создание и разрешение споров
-- Отмена транзакций
-- Контроль за статусами и жизненным циклом транзакций
-
-### Система Escrow
-- Безопасная промежуточная задержка средств
-- Защита покупателя и продавца при совершении сделок
-- Поддержка различных сценариев разрешения споров
-
-### Кошельки пользователей
-- Создание и управление кошельками
-- Поддержка различных валют
-- Операции пополнения и вывода средств
-- Ведение истории операций
+---
 
 ## Архитектура
+- **FastAPI** — REST API
+- **PostgreSQL** — хранение кошельков, транзакций, истории
+- **RabbitMQ** — события для интеграции с marketplace, auth, chat
+- **Redis** — кеширование, идемпотентность, rate limiting
+- **Alembic** — миграции БД
+- **Модули**: routers, services, models, schemas, config
 
-### Модель данных
-- **Transaction**: основная модель транзакций с поддержкой различных статусов (PENDING, ESCROW_HELD, COMPLETED, REFUNDED, DISPUTED, RESOLVED, CANCELED)
-- **Wallet**: модель кошелька пользователя
-- **WalletTransaction**: модель для отслеживания операций с кошельком
+Подробнее см. [Документацию](./docs/api.md) и [Архитектуру](./documentation.md).
 
-### Система состояний
-- **TransactionStateMachine**: машина состояний для управления жизненным циклом транзакций
-- **TransactionStateService**: сервис для управления переходами между состояниями транзакций
-- **TransactionTimeoutService**: сервис для обработки истекших транзакций
+---
 
-### Система событий
-- **EventService**: служба для публикации и обработки внутренних событий
-- **EventRabbitBridge**: мост для трансляции событий в RabbitMQ
+## Быстрый старт
 
-### Идемпотентность
-- **IdempotencyService**: сервис для обеспечения идемпотентности операций
-- **IdempotencyRecord**: модель для хранения записей идемпотентности
-- **IdempotencyCleanupService**: сервис для периодической очистки устаревших записей
+### 1. Клонирование и установка зависимостей
+```bash
+cd backend/payment-svc
+pip install -r requirements.txt
+```
 
-## API Endpoints
+### 2. Запуск локально
+```bash
+uvicorn src.main:app --host 0.0.0.0 --port 8002 --reload
+```
 
-### Транзакции
-- `POST /transactions` - Создание новой транзакции
-- `GET /transactions` - Получение списка транзакций
-- `GET /transactions/{id}` - Получение информации о транзакции
-- `GET /transactions/{id}/actions` - Получение доступных действий
-- `POST /transactions/{id}/escrow` - Перевод средств в Escrow
-- `POST /transactions/{id}/complete` - Завершение транзакции
-- `POST /transactions/{id}/refund` - Возврат средств
-- `POST /transactions/{id}/dispute` - Открытие спора
-- `POST /transactions/{id}/resolve` - Разрешение спора
-- `POST /transactions/{id}/cancel` - Отмена транзакции
+### 3. Запуск через Docker
+```bash
+docker build -t payment-svc .
+docker run --env-file .env -p 8002:8002 payment-svc
+```
 
-### Кошельки
-- `GET /wallets` - Получение списка кошельков пользователя
-- `GET /wallets/{id}` - Получение информации о кошельке
-- `POST /wallets` - Создание нового кошелька
-- `POST /wallets/{id}/deposit` - Пополнение кошелька
-- `POST /wallets/{id}/withdraw` - Вывод средств
+### 4. Проверка работоспособности
+- [http://localhost:8002/health](http://localhost:8002/health) — healthcheck
+- [http://localhost:8002/docs](http://localhost:8002/docs) — Swagger UI
 
-## Интеграции
-
-### RabbitMQ
-- Публикация событий для других микросервисов
-- Обработка событий от других микросервисов
-
-## Безопасность
-- Проверка прав доступа для всех операций
-- Идемпотентность операций через заголовок X-Idempotency-Key
-- Логирование всех операций для аудита
-
-## Развертывание
-Сервис разворачивается как отдельный контейнер и взаимодействует с другими микросервисами через RabbitMQ и HTTP API.
+---
 
 ## Переменные окружения
-- `DATABASE_URL` - URL для подключения к базе данных
-- `RABBITMQ_URL` - URL для подключения к RabbitMQ
-- `SERVICE_PORT` - Порт для запуска сервиса (по умолчанию 8080)
-- `LOG_LEVEL` - Уровень логирования
-- `JWT_SECRET` - Секрет для проверки JWT токенов 
+- `DATABASE_URL` — строка подключения к PostgreSQL
+- `RABBITMQ_URL` — строка подключения к RabbitMQ
+- `REDIS_HOST`, `REDIS_PORT` — параметры Redis
+- `JWT_SECRET` — секрет для проверки JWT токенов
+- `SERVICE_PORT` — порт запуска сервиса (по умолчанию 8002)
+- `LOG_LEVEL` — уровень логирования
+- `AUTH_SERVICE_URL` — URL сервиса аутентификации
+- `MARKETPLACE_SERVICE_URL` — URL сервиса маркетплейса
+
+Все переменные можно задать в `.env` файле.
+
+---
+
+## Миграции базы данных
+
+### Применение миграций
+```bash
+alembic upgrade head
+```
+
+### Создание новой миграции
+```bash
+alembic revision --autogenerate -m "описание изменений"
+```
+
+---
+
+## Основные API эндпоинты
+
+### Кошельки
+- `POST /wallets` — создать кошелек
+- `GET /wallets` — список кошельков
+- `GET /wallets/{id}` — информация о кошельке
+- `POST /wallets/{id}/deposit` — пополнение
+- `POST /wallets/{id}/withdraw` — вывод средств
+- `POST /wallets/{id}/convert` — конвертация валюты
+
+### Транзакции
+- `POST /transactions` — создать транзакцию
+- `GET /transactions` — список транзакций
+- `GET /transactions/{id}` — информация о транзакции
+- `POST /transactions/{id}/escrow` — перевод в эскроу
+- `POST /transactions/{id}/complete` — завершить
+- `POST /transactions/{id}/refund` — возврат
+- `POST /transactions/{id}/dispute` — открыть спор
+- `POST /transactions/{id}/resolve` — разрешить спор
+- `POST /transactions/{id}/cancel` — отменить
+
+### История и отчеты
+- `GET /transaction_history` — история транзакций
+- `GET /transaction_history/{id}` — история по транзакции
+- `GET /transaction_history/{id}/export` — экспорт истории (CSV/JSON)
+
+### Валюта и комиссии
+- `GET /currency/rates` — курсы валют
+- `POST /currency/convert/preview` — расчет конвертации
+- `POST /currency/convert/execute` — выполнить конвертацию
+- `GET /currency/fees` — комиссии
+
+### Статистика
+- `GET /statistics/seller` — статистика продавца
+- `GET /statistics/transactions/summary` — сводка по транзакциям
+- `GET /statistics/popular-games` — популярные игры
+
+### Продажи
+- `POST /sales/{sale_id}/initiate-payment` — инициировать оплату
+- `POST /sales/{sale_id}/confirm` — подтвердить оплату
+- `POST /sales/{sale_id}/reject` — отклонить оплату
+- `POST /sales/{sale_id}/complete-delivery` — завершить доставку
+- `POST /sales/{sale_id}/release-funds` — вывести средства
+
+Полная спецификация — [docs/api.md](./docs/api.md)
+
+---
+
+## Интеграция с другими сервисами
+- **auth-svc** — проверка JWT, создание пользователей
+- **marketplace-svc** — получение информации о товарах, продажах
+- **RabbitMQ** — события о транзакциях, кошельках, продажах
+- **Redis** — кеширование, идемпотентность
+
+---
+
+## Безопасность и best practices
+- JWT-аутентификация для всех операций
+- Идемпотентность через заголовок `X-Idempotency-Key`
+- Логирование и аудит всех операций
+- Проверка прав доступа (admin, seller, buyer)
+- Защита от дублирования и race conditions
+- Эскроу для безопасных сделок
+
+---
+
+## Контакты и поддержка
+- Вопросы и баги: через Issues в репозитории
+- Техническая поддержка: [email@example.com]
+- Подробнее: см. [Документацию](./documentation.md) 
